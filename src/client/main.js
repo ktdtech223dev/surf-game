@@ -1,5 +1,5 @@
-// SurfGame — main entry point
-// Fixed 128 Hz physics, variable-rate rendering, WebSocket multiplayer + combat + audio
+// SurfGame — main entry point (Phase 5)
+// 3-section map · combat · audio · settings · checkpoints · leaderboard
 
 import { Renderer }        from './Renderer.js';
 import { InputManager }    from './Input.js';
@@ -11,59 +11,51 @@ import { KillFeed }        from './KillFeed.js';
 import { Scoreboard }      from './Scoreboard.js';
 import { SoundManager }    from './SoundManager.js';
 import { SettingsManager } from './SettingsManager.js';
-import { buildTestMap, getSpawnPosition } from './MapBuilder.js';
+import { buildTestMap, getSpawnPosition, MAP } from './MapBuilder.js';
 import { createPlayerState, simulateTick } from '../shared/physics/MovementEngine.js';
 import { TICK_RATE, TICK_INTERVAL } from '../shared/physics/constants.js';
 import * as Vec3 from '../shared/physics/vec3.js';
 
 // ── Init ───────────────────────────────────────────────────────────────────────
-const renderer  = new Renderer();
-const input     = new InputManager();
-const debug     = new DebugOverlay();
-const net       = new NetworkClient();
-const ghosts    = new GhostRenderer(renderer.scene);
-const killFeed  = new KillFeed();
+const renderer   = new Renderer();
+const input      = new InputManager();
+const debug      = new DebugOverlay();
+const net        = new NetworkClient();
+const ghosts     = new GhostRenderer(renderer.scene);
+const killFeed   = new KillFeed();
 const scoreboard = new Scoreboard();
-const sound     = new SoundManager();
-const settings  = new SettingsManager();
+const sound      = new SoundManager();
+const settings   = new SettingsManager();
 
 const playerState = createPlayerState();
 
-// Spawn
 const spawn = getSpawnPosition();
-playerState.position.x = spawn.x;
-playerState.position.y = spawn.y;
-playerState.position.z = spawn.z;
-playerState.respawnPosition.x = spawn.x;
-playerState.respawnPosition.y = spawn.y;
-playerState.respawnPosition.z = spawn.z;
+['x', 'y', 'z'].forEach(k => {
+  playerState.position[k]      = spawn[k];
+  playerState.respawnPosition[k] = spawn[k];
+});
 input.yaw = Math.PI;
 
-// Build map
 const collisionWorld = buildTestMap(renderer);
-
-// Weapon system
 const weapon = new WeaponSystem(net);
 
 // ── Apply saved settings ───────────────────────────────────────────────────────
 input.sensitivity = settings.sensitivity;
 renderer.setFOV?.(settings.fov);
+sound.setVolume(settings.volume);
 
-// Settings live-update callback
 settings.onChange((key, value) => {
   if (key === 'sensitivity') input.sensitivity = value;
   if (key === 'fov')         renderer.setFOV?.(value);
   if (key === 'volume')      sound.setVolume(value);
-  if (key === 'name')        net.sendMeta(value);
+  if (key === 'name' || key === 'color') net.sendMeta(settings.name, settings.color);
 });
 
-// Settings gear button
 document.getElementById('settings-btn')?.addEventListener('click', () => {
-  if (!input.locked) return; // only while playing
+  if (!input.locked) return;
   settings.openPanel();
 });
 
-// Escape key: open/close settings (when locked and not in chat)
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && input.locked && !input.chatOpen) {
     if (settings.isPanelOpen()) settings.closePanel();
@@ -71,12 +63,15 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ── Local player health ────────────────────────────────────────────────────────
-let localHp    = 100;
-let localAlive = true;
-const hpFill   = document.getElementById('health-bar-fill');
-const hpValue  = document.getElementById('health-value');
-const dmgVign  = document.getElementById('damage-vignette');
+// ── Local player health + death state ─────────────────────────────────────────
+let localHp      = 100;
+let localAlive   = true;
+let _deadUntil   = 0; // performance.now() when respawn countdown ends
+const hpFill     = document.getElementById('health-bar-fill');
+const hpValue    = document.getElementById('health-value');
+const dmgVign    = document.getElementById('damage-vignette');
+const deathEl    = document.getElementById('death-overlay');
+const deathCount = document.getElementById('death-countdown');
 
 function _setHp(hp) {
   localHp = Math.max(0, Math.min(100, hp));
@@ -91,20 +86,118 @@ function _setHp(hp) {
   }
 }
 
-function _flashDamage() {
+function _showDeath() {
+  localAlive = false;
+  _deadUntil = performance.now() + 2000;
+  if (deathEl) deathEl.style.display = 'flex';
+  _flashDamage(true);
+}
+
+function _hideDeath() {
+  if (deathEl) deathEl.style.display = 'none';
+}
+
+function _tickDeath() {
+  if (!deathEl || localAlive) return;
+  const rem = Math.max(0, _deadUntil - performance.now()) / 1000;
+  if (deathCount) deathCount.textContent = rem > 0 ? `Respawning in ${rem.toFixed(1)}s…` : 'Respawning…';
+}
+
+function _flashDamage(hard = false) {
   if (!dmgVign) return;
-  dmgVign.style.opacity    = '1';
-  dmgVign.style.transition = 'opacity 0.08s';
+  dmgVign.style.opacity    = hard ? '1' : '0.7';
+  dmgVign.style.transition = `opacity ${hard ? '0.05' : '0.08'}s`;
   setTimeout(() => {
     dmgVign.style.opacity    = '0';
-    dmgVign.style.transition = 'opacity 0.5s';
-  }, 120);
+    dmgVign.style.transition = 'opacity 0.6s';
+  }, hard ? 200 : 120);
+}
+
+// ── Checkpoint splits ──────────────────────────────────────────────────────────
+const splitEl   = document.getElementById('split-display');
+const splits    = { cp1: null, cp2: null };   // elapsed seconds at each checkpoint
+let   splitBest = { cp1: null, cp2: null };   // best run splits (session)
+
+function _updateSplits(pos, elapsed) {
+  // CP1: just past end of section 1
+  if (!splits.cp1 && pos.z > MAP.S1_END_Z && pos.y < MAP.PAD1_Y + 30) {
+    splits.cp1 = elapsed;
+    sound.playChat(); // repurpose as checkpoint ping
+  }
+  // CP2: just past end of section 2
+  if (!splits.cp2 && pos.z > MAP.S2_END_Z && pos.y < MAP.PAD2_Y + 30) {
+    splits.cp2 = elapsed;
+    sound.playChat();
+  }
+  _renderSplits(elapsed);
+}
+
+function _resetSplits() {
+  splits.cp1 = null;
+  splits.cp2 = null;
+}
+
+function _renderSplits(elapsed) {
+  if (!splitEl) return;
+  const fmt = t => {
+    if (t == null) return '--:--.---';
+    const ms  = Math.floor((t % 1) * 1000);
+    const sec = Math.floor(t % 60);
+    const min = Math.floor(t / 60);
+    const pad = (n, w = 2) => String(n).padStart(w, '0');
+    return `${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+  };
+  const diff = (val, best) => {
+    if (val == null || best == null) return '';
+    const d = val - best;
+    const col = d <= 0 ? '#0f0' : '#f44';
+    const sign = d > 0 ? '+' : '';
+    return ` <span style="color:${col}">${sign}${d.toFixed(2)}s</span>`;
+  };
+  splitEl.innerHTML =
+    `<div style="color:#3366cc;font-size:11px">CP1 ${fmt(splits.cp1)}${diff(splits.cp1, splitBest.cp1)}</div>` +
+    `<div style="color:#00cc88;font-size:11px">CP2 ${fmt(splits.cp2)}${diff(splits.cp2, splitBest.cp2)}</div>` +
+    `<div style="color:#ffcc00;font-size:12px;font-weight:bold">RUN ${fmt(elapsed)}</div>`;
+}
+
+// ── Finish banner ──────────────────────────────────────────────────────────────
+const finishBanner = document.getElementById('finish-banner');
+const finishTimeEl = document.getElementById('finish-time');
+const finishPbEl   = document.getElementById('finish-pb');
+let   bestRunSec   = null;
+
+function _showFinish(timeSec) {
+  // Update best splits
+  if (splits.cp1 && (splitBest.cp1 == null || splits.cp1 < splitBest.cp1)) splitBest.cp1 = splits.cp1;
+  if (splits.cp2 && (splitBest.cp2 == null || splits.cp2 < splitBest.cp2)) splitBest.cp2 = splits.cp2;
+
+  const isPB = bestRunSec == null || timeSec < bestRunSec;
+  if (isPB) bestRunSec = timeSec;
+
+  const fmt = t => {
+    const ms  = Math.floor((t % 1) * 1000);
+    const sec = Math.floor(t % 60);
+    const min = Math.floor(t / 60);
+    const pad = (n, w = 2) => String(n).padStart(w, '0');
+    return `${pad(min)}:${pad(sec)}.${pad(ms, 3)}`;
+  };
+
+  if (finishTimeEl) finishTimeEl.textContent = fmt(timeSec);
+  if (finishPbEl)   finishPbEl.textContent   = isPB ? '★ NEW PERSONAL BEST' : `Best: ${fmt(bestRunSec)}`;
+  if (finishBanner) finishBanner.style.display = 'block';
+
+  sound.playKill(); // triumphant sound
+  net.sendFinish(timeSec);
+
+  setTimeout(() => {
+    if (finishBanner) finishBanner.style.display = 'none';
+  }, 6000);
 }
 
 // ── Network callbacks ──────────────────────────────────────────────────────────
 net.onWelcome = (id) => {
   scoreboard.setLocalId(id);
-  net.sendMeta(settings.name);
+  net.sendMeta(settings.name, settings.color);
 };
 
 net.onPeerUpdate = (id, snap, serverTime) => {
@@ -112,21 +205,19 @@ net.onPeerUpdate = (id, snap, serverTime) => {
   scoreboard.upsert(id, { id, name: snap.name, hp: snap.hp });
 };
 
-net.onPeerLeave = (id) => {
-  ghosts.remove(id);
-  scoreboard.remove(id);
-};
+net.onPeerLeave = (id) => { ghosts.remove(id); scoreboard.remove(id); };
 
-net.onDmg = (targetId, shooterId, hp) => {
+net.onDmg = (targetId, _shooterId, hp) => {
   ghosts.setHp(targetId, hp);
   ghosts.flashHit(targetId);
   scoreboard.upsert(targetId, { hp });
 };
 
-net.onHurt = (damage, hp) => {
+net.onHurt = (_damage, hp) => {
   _setHp(hp);
-  _flashDamage();
   sound.playHurt();
+  if (hp <= 0) _showDeath();
+  else _flashDamage();
 };
 
 net.onKill = (kill) => {
@@ -143,6 +234,7 @@ net.onKill = (kill) => {
 
 net.onRespawn = (hp) => {
   localAlive = true;
+  _hideDeath();
   _setHp(hp);
   playerState.position.x = spawn.x;
   playerState.position.y = spawn.y;
@@ -150,24 +242,27 @@ net.onRespawn = (hp) => {
   Vec3.set(playerState.velocity, 0, 0, 0);
 };
 
-net.onHitConfirm = () => {
-  weapon.onHitConfirm();
-  sound.playHit();
-};
+net.onHitConfirm = () => { weapon.onHitConfirm(); sound.playHit(); };
 
 net.onPlayerList = (list) => {
   scoreboard.setLocalId(net.id);
   scoreboard.updateFromList(list);
 };
 
-net.onChat = (id, name, text) => {
-  _addChatLine(name, text);
-  sound.playChat();
+net.onChat = (id, name, text) => { _addChatLine(name, text); sound.playChat(); };
+
+net.onMetaUpdate = (id, name, color) => {
+  ghosts.setName(id, name);
+  if (color) ghosts.setColor?.(id, color);
+  scoreboard.upsert(id, { name });
 };
 
-net.onMetaUpdate = (id, name) => {
-  ghosts.setName(id, name);
-  scoreboard.upsert(id, { name });
+net.onFinish = ({ name, time }) => {
+  killFeed.addKill({ killerName: name, victimName: `${_fmtTime(time)}`, killerId: -1, victimId: -1 }, net.id);
+};
+
+net.onLeaderboard = (list) => {
+  scoreboard.updateLeaderboard(list);
 };
 
 net.connect();
@@ -203,89 +298,80 @@ if (chatInput) {
   });
 }
 
-function _openChat() {
-  input.chatOpen = true;
-  chatWrap?.classList.add('open');
-  setTimeout(() => chatInput?.focus(), 0);
-}
-
-function _closeChat() {
-  input.chatOpen = false;
-  chatWrap?.classList.remove('open');
-  chatInput?.blur();
-}
+function _openChat()  { input.chatOpen = true;  chatWrap?.classList.add('open');    setTimeout(() => chatInput?.focus(), 0); }
+function _closeChat() { input.chatOpen = false; chatWrap?.classList.remove('open'); chatInput?.blur(); }
 
 let _prevChatOpen  = false;
 let _prevScoreOpen = false;
 
-// ── Reload key ────────────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyR' && !input.chatOpen && input.locked && !settings.isPanelOpen()) {
-    weapon.reload();
-    sound.playReload();
+    weapon.reload(); sound.playReload();
   }
 });
 
 // ── Run timer ─────────────────────────────────────────────────────────────────
-const TIMER_START_Z  = 360;
-const TIMER_FINISH_Z = 3750;
-const TIMER_FINISH_Y = -700;
+const TIMER_START_Z = 360;
 
 let runStartTime  = null;
 let runActive     = false;
 let currentRunSec = null;
-let bestRunSec    = null;
+let _finishedThisRun = false;
 
 function _updateRunTimer() {
   const pos = playerState.position;
+
   if (!runActive && pos.z > TIMER_START_Z && pos.y > -600) {
-    runActive = true; runStartTime = performance.now(); currentRunSec = 0;
+    runActive       = true;
+    runStartTime    = performance.now();
+    currentRunSec   = 0;
+    _finishedThisRun = false;
+    _resetSplits();
+    if (splitEl) splitEl.style.display = 'block';
   }
+
   if (runActive) {
     currentRunSec = (performance.now() - runStartTime) / 1000;
-    if (pos.z > TIMER_FINISH_Z && pos.y < TIMER_FINISH_Y) {
-      const t = currentRunSec;
-      if (bestRunSec === null || t < bestRunSec) bestRunSec = t;
-      runActive = false; runStartTime = null;
+    _updateSplits(pos, currentRunSec);
+
+    // Finish detection: past section 3 end and at finish platform level
+    if (!_finishedThisRun && pos.z > MAP.FINISH_Z && pos.y < MAP.PAD3_Y + 60) {
+      _finishedThisRun = true;
+      _showFinish(currentRunSec);
+      runActive = false;
+      if (splitEl) splitEl.style.display = 'none';
     }
   }
-  if (pos.z < 100) { runActive = false; runStartTime = null; currentRunSec = null; }
+
+  // Reset if spawned back at start
+  if (pos.z < 100) {
+    runActive        = false;
+    runStartTime     = null;
+    currentRunSec    = null;
+    _finishedThisRun = false;
+    _resetSplits();
+    if (splitEl) splitEl.style.display = 'none';
+  }
 }
 
 // ── Footstep timing ───────────────────────────────────────────────────────────
-let _lastStepTime   = 0;
-let _wasOnGround    = false;
-let _wasInAir       = false;
+let _lastStepTime = 0;
+let _wasInAir     = false;
 
 function _handleFootsteps(state) {
-  const now       = performance.now();
-  const onGround  = state.onGround;
-  const hSpeed    = Vec3.lengthXZ(state.velocity);
-
-  // Land sound
-  if (onGround && _wasInAir && hSpeed > 100) {
-    sound.playLand();
-    _lastStepTime = now;
-  }
-  _wasInAir    = !onGround && !state.onRamp;
-
-  // Footsteps while walking
-  if (onGround && hSpeed > 30 && now - _lastStepTime > 380) {
-    sound.playFootstep();
-    _lastStepTime = now;
-  }
+  const now      = performance.now();
+  const onGround = state.onGround;
+  const hSpeed   = Vec3.lengthXZ(state.velocity);
+  if (onGround && _wasInAir && hSpeed > 100) { sound.playLand(); _lastStepTime = now; }
+  _wasInAir = !onGround && !state.onRamp;
+  if (onGround && hSpeed > 30 && now - _lastStepTime > 380) { sound.playFootstep(); _lastStepTime = now; }
 }
 
-// ── Game init sequence ─────────────────────────────────────────────────────────
-// Show name prompt if first launch, then proceed to game
+// ── Game init ─────────────────────────────────────────────────────────────────
 async function initGame() {
-  if (settings.isFirstLaunch) {
-    await settings.promptName();
-  }
-  // Kick off game loop after name is set
+  if (settings.isFirstLaunch) await settings.promptName();
   requestAnimationFrame(gameLoop);
 }
-
 initGame();
 
 // ── Game loop ──────────────────────────────────────────────────────────────────
@@ -299,8 +385,6 @@ const NET_SEND_EVERY = 8;
 
 function gameLoop(now) {
   requestAnimationFrame(gameLoop);
-
-  // Init audio on first frame (after user gesture via name prompt or click)
   sound.init();
 
   const rawDt = (now - lastTime) / 1000;
@@ -309,70 +393,54 @@ function gameLoop(now) {
   accumulator += dt;
 
   while (accumulator >= TICK_INTERVAL) {
-    const currentInput = input.sample();
-    currentInput.tick  = tickCount++;
-    simulateTick(playerState, currentInput, collisionWorld, TICK_INTERVAL);
+    const inp = input.sample();
+    inp.tick  = tickCount++;
+    simulateTick(playerState, inp, collisionWorld, TICK_INTERVAL);
     accumulator -= TICK_INTERVAL;
 
     _handleFootsteps(playerState);
 
-    // Shoot
     const canShoot = input.locked && !input.chatOpen && localAlive && !settings.isPanelOpen();
-    if (canShoot && currentInput.shoot) {
-      weapon.tryFire(null, playerState.position, currentInput.yaw, currentInput.pitch);
-    }
-    if (canShoot && input.isFireHeld()) {
-      weapon.tryFire(null, playerState.position, currentInput.yaw, currentInput.pitch);
-    }
+    if (canShoot && inp.shoot)        weapon.tryFire(null, playerState.position, inp.yaw, inp.pitch);
+    if (canShoot && input.isFireHeld()) weapon.tryFire(null, playerState.position, inp.yaw, inp.pitch);
 
     netTickCount++;
     if (netTickCount % NET_SEND_EVERY === 0) {
-      net.sendSnapshot(playerState.position, playerState.velocity, currentInput.yaw, playerState.onRamp);
+      net.sendSnapshot(playerState.position, playerState.velocity, inp.yaw, playerState.onRamp);
     }
   }
 
   _updateRunTimer();
+  _tickDeath();
 
-  // Chat sync
-  if (input.chatOpen && !_prevChatOpen) _openChat();
-  if (!input.chatOpen && _prevChatOpen) _closeChat();
+  // Chat / scoreboard sync
+  const inp2 = input.sample();
+  if (input.chatOpen  && !_prevChatOpen)  _openChat();
+  if (!input.chatOpen && _prevChatOpen)   _closeChat();
   _prevChatOpen = input.chatOpen;
 
-  // Scoreboard sync
-  if (input.scoreboardOpen && !_prevScoreOpen) scoreboard.show();
-  if (!input.scoreboardOpen && _prevScoreOpen) scoreboard.hide();
+  if (input.scoreboardOpen  && !_prevScoreOpen) scoreboard.show();
+  if (!input.scoreboardOpen &&  _prevScoreOpen) scoreboard.hide();
   _prevScoreOpen = input.scoreboardOpen;
 
-  // Ticks
+  // Subsystem ticks
   ghosts.tick();
   killFeed.tick();
   weapon.tick();
-
-  // Wind sound
-  const hSpeedNow = Vec3.lengthXZ(playerState.velocity);
-  sound.setWindSpeed(hSpeedNow);
+  sound.setWindSpeed(Vec3.lengthXZ(playerState.velocity));
 
   // Camera
-  const currentInput = input.sample();
-  const hSpeed       = Vec3.lengthXZ(playerState.velocity);
-
+  const hSpeed     = Vec3.lengthXZ(playerState.velocity);
   const targetRoll = (playerState.onRamp && playerState.surfaceNormal)
-    ? -playerState.surfaceNormal.x * (Math.PI / 15)
-    : 0;
+    ? -playerState.surfaceNormal.x * (Math.PI / 15) : 0;
   cameraRoll += (targetRoll - cameraRoll) * 0.1;
 
-  renderer.updateCamera(
-    playerState.position,
-    currentInput.yaw,
-    currentInput.pitch,
-    hSpeed,
-    cameraRoll,
-  );
+  renderer.updateCamera(playerState.position, inp2.yaw, inp2.pitch, hSpeed, cameraRoll);
   renderer.updateVelocityArrow(playerState.position, playerState.velocity);
   renderer.setVignetteIntensity(Math.max(0, Math.min(1, (hSpeed - 400) / 800)));
   renderer.render();
 
-  debug.update(playerState, currentInput, {
+  debug.update(playerState, inp2, {
     playerCount: net.playerCount,
     connected:   net.connected,
     runTime:     currentRunSec,
@@ -382,12 +450,12 @@ function gameLoop(now) {
   });
 }
 
-// Dev handle
 window.__surf = { playerState, input, collisionWorld, net, weapon, sound, settings };
+console.log(`[SurfGame] ${TICK_RATE} Hz physics | 3-section map`);
 
-console.log(`[SurfGame] ${TICK_RATE} Hz physics | Click to lock mouse`);
-console.log('[SurfGame] LMB: shoot · R: reload · Tab: scoreboard · Enter: chat · Esc: settings');
-
-function _esc(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function _esc(str)   { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _fmtTime(t) {
+  const ms=Math.floor((t%1)*1000), sec=Math.floor(t%60), min=Math.floor(t/60);
+  const pad=(n,w=2)=>String(n).padStart(w,'0');
+  return `${pad(min)}:${pad(sec)}.${pad(ms,3)}`;
 }

@@ -409,6 +409,62 @@
     }
     #cfg-close:hover { border-color: #00cfff; color: #00cfff; }
 
+    /* ── Death / respawn overlay ─────────────────────────────── */
+    #death-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(60,0,0,0.55);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    #death-overlay h2 {
+      font-size: 42px;
+      font-weight: 900;
+      color: #ff2222;
+      letter-spacing: 8px;
+      text-shadow: 0 0 30px rgba(255,0,0,0.8);
+    }
+    #death-countdown {
+      font-size: 16px;
+      color: #ff8888;
+    }
+
+    /* ── Finish announcement ─────────────────────────────────── */
+    #finish-banner {
+      display: none;
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    #finish-banner h2 {
+      font-size: 36px;
+      font-weight: 900;
+      color: #ffcc00;
+      letter-spacing: 6px;
+      text-shadow: 0 0 24px rgba(255,204,0,0.8);
+      animation: pulse 0.8s ease-in-out infinite;
+    }
+    #finish-time { font-size: 24px; color: #fff; margin-top: 4px; }
+    #finish-pb   { font-size: 13px; color: #0f0; margin-top: 2px; }
+
+    /* ── Checkpoint split display ────────────────────────────── */
+    #split-display {
+      position: absolute;
+      top: 50%; right: 16px;
+      transform: translateY(-50%);
+      text-align: right;
+      font-size: 12px;
+      line-height: 2;
+      pointer-events: none;
+    }
+
     /* ── Settings gear button ────────────────────────────────── */
     #settings-btn {
       position: absolute;
@@ -464,6 +520,22 @@
     <!-- Scoreboard -->
     <div id="scoreboard"></div>
 
+    <!-- Death overlay -->
+    <div id="death-overlay">
+      <h2>YOU DIED</h2>
+      <div id="death-countdown">Respawning…</div>
+    </div>
+
+    <!-- Finish banner -->
+    <div id="finish-banner">
+      <h2>FINISH!</h2>
+      <div id="finish-time"></div>
+      <div id="finish-pb"></div>
+    </div>
+
+    <!-- Checkpoint splits -->
+    <div id="split-display"></div>
+
     <!-- Settings gear -->
     <div id="settings-btn" title="Settings (Esc)">⚙</div>
 
@@ -497,6 +569,10 @@
           <span class="cfg-label">VOLUME</span>
           <input id="cfg-volume" class="cfg-slider" type="range" min="0" max="1" step="0.05" value="0.7">
           <span id="cfg-volume-label" class="cfg-value">70%</span>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">GHOST COLOR</span>
+          <input id="cfg-color" type="color" value="#00cfff" style="width:48px;height:24px;border:1px solid #0a2040;background:none;cursor:pointer;border-radius:3px;">
         </div>
         <button id="cfg-close">CLOSE (ESC)</button>
       </div>

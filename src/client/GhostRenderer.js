@@ -42,6 +42,16 @@ export class GhostRenderer {
     if (g) { g.name = name; this._rebuildLabel(g); }
   }
 
+  setColor(id, hexStr) {
+    const g = this.ghosts.get(id);
+    if (!g) return;
+    const color = parseInt(hexStr.replace('#', ''), 16);
+    if (isNaN(color)) return;
+    g.color = color;
+    g.mats.forEach(m => m.color.setHex(color));
+    this._rebuildLabel(g);
+  }
+
   setHp(id, hp) {
     const g = this.ghosts.get(id);
     if (g) { g.hp = hp; this._updateHpBar(g); }

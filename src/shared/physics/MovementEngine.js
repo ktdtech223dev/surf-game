@@ -279,8 +279,8 @@ function moveAndCollide(state, world, dt) {
     }
   }
 
-  // World bounds safety net (kill zones should catch first, this is a fallback)
-  if (state.position.y < -1500) {
+  // World bounds safety net (kill zones catch first, this is a fallback for Section 3)
+  if (state.position.y < -2000) {
     state.position = Vec3.copy(state.respawnPosition);
     state.velocity = Vec3.create(0, 0, 0);
     state.onGround = false;

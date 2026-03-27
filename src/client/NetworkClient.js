@@ -26,7 +26,9 @@ export class NetworkClient {
     this.onHitConfirm  = null; // (targetId) → void
     this.onPlayerList  = null; // (list) → void
     this.onChat        = null; // (id, name, text) → void
-    this.onMetaUpdate  = null; // (id, name) → void
+    this.onMetaUpdate  = null; // (id, name, color) → void
+    this.onFinish      = null; // ({ id, name, time }) → void
+    this.onLeaderboard = null; // (list) → void
 
     this._pingInterval = null;
     this._pingSentAt   = 0;
@@ -138,7 +140,15 @@ export class NetworkClient {
         break;
 
       case 'meta':
-        if (this.onMetaUpdate) this.onMetaUpdate(msg.id, msg.name);
+        if (this.onMetaUpdate) this.onMetaUpdate(msg.id, msg.name, msg.color);
+        break;
+
+      case 'finish':
+        if (this.onFinish) this.onFinish({ id: msg.id, name: msg.name, time: msg.time });
+        break;
+
+      case 'leaderboard':
+        if (this.onLeaderboard) this.onLeaderboard(msg.list || []);
         break;
 
       case 'pong':
@@ -171,8 +181,12 @@ export class NetworkClient {
     this._send({ type: 'shoot', ox, oy, oz, dx, dy, dz });
   }
 
-  sendMeta(name) {
-    this._send({ type: 'meta', name });
+  sendMeta(name, color) {
+    this._send({ type: 'meta', name, color });
+  }
+
+  sendFinish(timeSec) {
+    this._send({ type: 'finish', time: +timeSec.toFixed(3) });
   }
 
   sendChat(text) {

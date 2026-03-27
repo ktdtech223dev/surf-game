@@ -27,10 +27,30 @@ const HIT_RADIUS    = 28;    // player collision sphere radius for bullets
 const MAX_RANGE     = 4000;  // max bullet range
 const BULLET_DAMAGE = 20;    // hp per hit (5 shots to kill)
 const RESPAWN_DELAY = 2000;  // ms before respawn after death
+const MIN_FINISH_TIME = 15;  // seconds — minimum valid run time
+const MAX_LEADERBOARD = 10;  // top N times to keep
 
 // ── Player state ──────────────────────────────────────────────────────────────
-const players = new Map(); // id → { ws, snap, hp, name, kills, deaths, pingMs, alive }
+const players = new Map(); // id → { ws, snap, hp, name, kills, deaths, pingMs, alive, color }
 let nextId = 1;
+
+// ── Run leaderboard (top 10 best times, persists in memory) ───────────────────
+const leaderboard = []; // [{ name, time, date }] sorted by time asc
+
+function recordFinish(name, timeSec) {
+  // Check if this player already has a better time
+  const existing = leaderboard.findIndex(e => e.name === name);
+  if (existing !== -1 && leaderboard[existing].time <= timeSec) return; // not a PB
+  if (existing !== -1) leaderboard.splice(existing, 1);
+
+  leaderboard.push({ name, time: timeSec, date: new Date().toISOString().slice(0, 10) });
+  leaderboard.sort((a, b) => a.time - b.time);
+  if (leaderboard.length > MAX_LEADERBOARD) leaderboard.length = MAX_LEADERBOARD;
+}
+
+function broadcastLeaderboard() {
+  broadcastAll({ type: 'leaderboard', list: leaderboard });
+}
 
 function broadcast(senderId, msg) {
   const data = JSON.stringify(msg);
@@ -83,6 +103,7 @@ wss.on('connection', (ws) => {
     if (pid !== id && p.snap) existing.push({ id: pid, name: p.name, hp: p.hp, ...p.snap });
   }
   send(ws, { type: 'welcome', id, name, count: players.size, existing });
+  if (leaderboard.length > 0) send(ws, { type: 'leaderboard', list: leaderboard });
   broadcast(id, { type: 'join', id, name });
 
   console.log(`[+] ${name} connected  (${players.size} online)`);
@@ -164,8 +185,22 @@ wss.on('connection', (ws) => {
       case 'meta': {
         if (msg.name && typeof msg.name === 'string') {
           player.name = msg.name.slice(0, 20).replace(/[<>]/g, '');
-          broadcast(id, { type: 'meta', id, name: player.name });
         }
+        if (msg.color && typeof msg.color === 'string') {
+          player.color = msg.color.replace(/[^0-9a-fA-F#]/g, '').slice(0, 7);
+        }
+        broadcast(id, { type: 'meta', id, name: player.name, color: player.color });
+        break;
+      }
+
+      case 'finish': {
+        if (!player.alive) break;
+        const timeSec = parseFloat(msg.time);
+        if (isNaN(timeSec) || timeSec < MIN_FINISH_TIME) break;
+        console.log(`[Finish] ${player.name}: ${timeSec.toFixed(3)}s`);
+        recordFinish(player.name, timeSec);
+        broadcastAll({ type: 'finish', id, name: player.name, time: timeSec });
+        broadcastLeaderboard();
         break;
       }
 

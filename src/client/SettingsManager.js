@@ -11,6 +11,7 @@ const DEFAULTS = {
   sensitivity: 0.002,
   fov:         90,
   volume:      0.7,
+  color:       '#00cfff',
 };
 
 export class SettingsManager {
@@ -28,6 +29,7 @@ export class SettingsManager {
   get sensitivity() { return this._data.sensitivity; }
   get fov()         { return this._data.fov; }
   get volume()      { return this._data.volume; }
+  get color()       { return this._data.color; }
 
   /** True if this is the player's first visit (name is default) */
   get isFirstLaunch() {
@@ -115,6 +117,9 @@ export class SettingsManager {
 
     const volLabel = byId('cfg-volume-label');
     if (volLabel) volLabel.textContent = Math.round(this._data.volume * 100) + '%';
+
+    const colorPick = byId('cfg-color');
+    if (colorPick) colorPick.value = this._data.color;
   }
 
   _bindPanel() {
@@ -145,6 +150,12 @@ export class SettingsManager {
       this._data.name = v;
       this._save();
       this._onChange?.('name', v);
+    });
+
+    document.getElementById('cfg-color')?.addEventListener('input', e => {
+      this._data.color = e.target.value;
+      this._save();
+      this._onChange?.('color', e.target.value);
     });
 
     document.getElementById('cfg-close')?.addEventListener('click', () => this.closePanel());
