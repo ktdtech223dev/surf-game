@@ -51,16 +51,22 @@ export class DebugOverlay {
       stateLabel = 'AIR'; stateColor = '#ff8800';
     }
 
-    // Section indicator
+    // Section indicator — uses sectionZBounds from active map if available
     const z = state.position.z;
     let section = '';
-    if      (z < 350)   section = '<span style="color:#445;font-size:10px"> SPAWN</span>';
-    else if (z < 2150)  section = '<span style="color:#3366cc;font-size:10px"> S1</span>';
-    else if (z < 2550)  section = '<span style="color:#445;font-size:10px"> PAD1</span>';
-    else if (z < 3750)  section = '<span style="color:#00cc88;font-size:10px"> S2</span>';
-    else if (z < 4150)  section = '<span style="color:#445;font-size:10px"> PAD2</span>';
-    else if (z < 5650)  section = '<span style="color:#aa44ff;font-size:10px"> S3</span>';
-    else                section = '<span style="color:#ffcc00;font-size:10px"> FINISH</span>';
+    const szBounds = extra.sectionZBounds;
+    if (szBounds && szBounds.length) {
+      const entry = szBounds.find(b => z < b.maxZ) ?? szBounds[szBounds.length - 1];
+      section = `<span style="color:${entry.color ?? '#445'};font-size:10px"> ${entry.label}</span>`;
+    } else {
+      if      (z < 350)   section = '<span style="color:#445;font-size:10px"> SPAWN</span>';
+      else if (z < 2150)  section = '<span style="color:#3366cc;font-size:10px"> S1</span>';
+      else if (z < 2550)  section = '<span style="color:#445;font-size:10px"> PAD1</span>';
+      else if (z < 3750)  section = '<span style="color:#00cc88;font-size:10px"> S2</span>';
+      else if (z < 4150)  section = '<span style="color:#445;font-size:10px"> PAD2</span>';
+      else if (z < 5650)  section = '<span style="color:#aa44ff;font-size:10px"> S3</span>';
+      else                section = '<span style="color:#ffcc00;font-size:10px"> FINISH</span>';
+    }
 
     // Speed gain rate (last 32 ticks ≈ 0.25 s)
     const hist = state.speedHistory;

@@ -192,8 +192,8 @@ export class NetworkClient {
     this._send({ type: 'meta', name, color });
   }
 
-  sendFinish(timeSec) {
-    this._send({ type: 'finish', time: +timeSec.toFixed(3) });
+  sendFinish(timeSec, mapId = 'map_01') {
+    this._send({ type: 'finish', time: +timeSec.toFixed(3), map_id: mapId });
   }
 
   sendChat(text) {

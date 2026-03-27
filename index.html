@@ -108,6 +108,14 @@
       0%, 100% { opacity: 0.5; }
       50%       { opacity: 1.0; }
     }
+    @keyframes slideInRight {
+      from { transform: translateX(120%); opacity: 0; }
+      to   { transform: translateX(0);   opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
 
     /* ── Speed vignette ────────────────────────────────────── */
     #speed-vignette {
@@ -588,7 +596,7 @@
     <div id="instructions">
       <h1>SURF</h1>
       <p>WASD &nbsp;·&nbsp; Mouse Look &nbsp;·&nbsp; Space Jump &nbsp;·&nbsp; LMB Shoot</p>
-      <p style="color:#556;font-size:12px">Tab: scoreboard &nbsp;·&nbsp; Enter: chat &nbsp;·&nbsp; R: reload</p>
+      <p style="color:#556;font-size:12px">Tab: scoreboard &nbsp;·&nbsp; Enter: chat &nbsp;·&nbsp; R: reload &nbsp;·&nbsp; M: menu &nbsp;·&nbsp; F: inspect knife</p>
       <div class="click-prompt">Click to start</div>
     </div>
   </div>

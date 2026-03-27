@@ -1,6 +1,7 @@
 /**
- * SurfGame server — Phase 2/3
- * Multiplayer: position sync, combat (hitscan), kill feed, chat
+ * SurfGame server — Production build
+ * Express REST API + WebSocket real-time multiplayer
+ * SQLite persistence via better-sqlite3
  */
 
 import express from 'express';
@@ -9,6 +10,19 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
+// DB must be imported before routes
+import './db.js';
+import { requireAuth } from './auth.js';
+
+// Routes
+import playerRoutes      from './routes/player.js';
+import scoresRoutes      from './routes/scores.js';
+import ghostsRoutes      from './routes/ghosts.js';
+import achievementsRoutes from './routes/achievements.js';
+import unlocksRoutes     from './routes/unlocks.js';
+import challengesRoutes  from './routes/challenges.js';
+import settingsRoutes    from './routes/settings.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT      = process.env.PORT || 3000;
 
@@ -16,43 +30,67 @@ const app        = express();
 const httpServer = createServer(app);
 const wss        = new WebSocketServer({ server: httpServer });
 
+// ── Middleware ────────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '4mb' }));
+app.use(express.urlencoded({ extended: false }));
+
+// CORS for dev
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+// ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api', playerRoutes);
+app.use('/api', scoresRoutes);
+app.use('/api', ghostsRoutes);
+app.use('/api', achievementsRoutes);
+app.use('/api', unlocksRoutes);
+app.use('/api', challengesRoutes);
+app.use('/api', settingsRoutes);
+
+// Health check
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
 // ── Static files ──────────────────────────────────────────────────────────────
 const distPath = join(__dirname, '../../dist');
 app.use(express.static(distPath));
 app.get('*', (_req, res) => res.sendFile(join(distPath, 'index.html')));
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const START_HP      = 100;
-const HIT_RADIUS    = 28;    // player collision sphere radius for bullets
-const MAX_RANGE     = 4000;  // max bullet range
-const BULLET_DAMAGE = 20;    // hp per hit (5 shots to kill)
-const RESPAWN_DELAY = 2000;  // ms before respawn after death
-const MIN_FINISH_TIME = 15;  // seconds — minimum valid run time
-const MAX_LEADERBOARD = 10;  // top N times to keep
+// ── WebSocket Constants ───────────────────────────────────────────────────────
+const START_HP          = 100;
+const HIT_RADIUS        = 28;
+const MAX_RANGE         = 4000;
+const BULLET_DAMAGE     = 20;
+const RESPAWN_DELAY     = 2000;
+const MIN_FINISH_TIME   = 5;    // seconds
+const MAX_LEADERBOARD   = 10;
+const SHOOT_INTERVAL_MS = 150;
 
 // ── Player state ──────────────────────────────────────────────────────────────
-const players = new Map(); // id → { ws, snap, hp, name, kills, deaths, pingMs, alive, color, lastShot }
-const SHOOT_INTERVAL_MS = 150; // min ms between server-accepted shots
+// id → { ws, snap, hp, name, color, kills, deaths, pingMs, alive, lastShot, playerId }
+const players = new Map();
 let nextId = 1;
 
-// ── Run leaderboard (top 10 best times, persists in memory) ───────────────────
-const leaderboard = []; // [{ name, time, date }] sorted by time asc
+// In-memory leaderboard (top 10 best times, all maps combined or per map)
+// For WS leaderboard we use a simple flat array
+const wsLeaderboard = []; // [{ name, mapId, time_ms, date }]
 
-function recordFinish(name, timeSec) {
-  // Check if this player already has a better time
-  const existing = leaderboard.findIndex(e => e.name === name);
-  if (existing !== -1 && leaderboard[existing].time <= timeSec) return; // not a PB
-  if (existing !== -1) leaderboard.splice(existing, 1);
-
-  leaderboard.push({ name, time: timeSec, date: new Date().toISOString().slice(0, 10) });
-  leaderboard.sort((a, b) => a.time - b.time);
-  if (leaderboard.length > MAX_LEADERBOARD) leaderboard.length = MAX_LEADERBOARD;
+function recordWsFinish(name, mapId, timeSec) {
+  const timeMs = Math.round(timeSec * 1000);
+  const key    = `${name}|${mapId}`;
+  const idx    = wsLeaderboard.findIndex(e => `${e.name}|${e.mapId}` === key);
+  if (idx !== -1 && wsLeaderboard[idx].time_ms <= timeMs) return;
+  if (idx !== -1) wsLeaderboard.splice(idx, 1);
+  wsLeaderboard.push({ name, mapId, time_ms: timeMs, date: new Date().toISOString().slice(0, 10) });
+  wsLeaderboard.sort((a, b) => a.time_ms - b.time_ms);
+  if (wsLeaderboard.length > MAX_LEADERBOARD * 4) wsLeaderboard.length = MAX_LEADERBOARD * 4;
 }
 
-function broadcastLeaderboard() {
-  broadcastAll({ type: 'leaderboard', list: leaderboard });
-}
-
+// ── Broadcast helpers ─────────────────────────────────────────────────────────
 function broadcast(senderId, msg) {
   const data = JSON.stringify(msg);
   for (const [id, p] of players) {
@@ -71,6 +109,15 @@ function send(ws, msg) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
+function broadcastPlayerList() {
+  const list = [];
+  for (const [id, p] of players) {
+    list.push({ id, name: p.name, color: p.color, kills: p.kills, deaths: p.deaths, hp: p.hp, alive: p.alive });
+  }
+  broadcastAll({ type: 'players', list });
+}
+setInterval(broadcastPlayerList, 3000);
+
 // ── Ray-sphere intersection ───────────────────────────────────────────────────
 function rayHitsSphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r) {
   const ex = ox - cx, ey = oy - cy, ez = oz - cz;
@@ -82,31 +129,26 @@ function rayHitsSphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, r) {
   return t >= 0 && t <= MAX_RANGE;
 }
 
-// ── Player list broadcast (periodic) ─────────────────────────────────────────
-function broadcastPlayerList() {
-  const list = [];
-  for (const [id, p] of players) {
-    list.push({ id, name: p.name, kills: p.kills, deaths: p.deaths, hp: p.hp, alive: p.alive });
-  }
-  broadcastAll({ type: 'players', list });
-}
-setInterval(broadcastPlayerList, 3000);
-
 // ── WebSocket handler ─────────────────────────────────────────────────────────
 wss.on('connection', (ws) => {
-  const id = nextId++;
+  const id   = nextId++;
   const name = `Player ${id}`;
-  players.set(id, { ws, snap: null, hp: START_HP, name, kills: 0, deaths: 0, pingMs: 0, alive: true });
+  players.set(id, {
+    ws, snap: null, hp: START_HP, name, color: '#00cfff',
+    kills: 0, deaths: 0, pingMs: 0, alive: true, lastShot: 0, playerId: null,
+  });
 
-  // Welcome: send own id + list of existing players
+  // Welcome
   const existing = [];
   for (const [pid, p] of players) {
-    if (pid !== id && p.snap) existing.push({ id: pid, name: p.name, hp: p.hp, ...p.snap });
+    if (pid !== id && p.snap) existing.push({ id: pid, name: p.name, color: p.color, hp: p.hp, ...p.snap });
   }
   send(ws, { type: 'welcome', id, name, count: players.size, existing });
-  if (leaderboard.length > 0) send(ws, { type: 'leaderboard', list: leaderboard });
-  broadcast(id, { type: 'join', id, name });
 
+  const lb = wsLeaderboard.slice(0, MAX_LEADERBOARD);
+  if (lb.length > 0) send(ws, { type: 'leaderboard', list: lb });
+
+  broadcast(id, { type: 'join', id, name });
   console.log(`[+] ${name} connected  (${players.size} online)`);
 
   ws.on('message', (raw) => {
@@ -120,9 +162,8 @@ wss.on('connection', (ws) => {
 
       case 'snap': {
         const x = +msg.x, y = +msg.y, z = +msg.z;
-        // Basic bounds sanity — reject obviously invalid positions
         if (!isFinite(x) || !isFinite(y) || !isFinite(z)) break;
-        if (Math.abs(x) > 5000 || y < -2500 || y > 500 || z < -500 || z > 8000) break;
+        if (Math.abs(x) > 6000 || y < -3000 || y > 1000 || z < -1000 || z > 12000) break;
         const snap = {
           x, y, z,
           vx: +msg.vx || 0, vy: +msg.vy || 0, vz: +msg.vz || 0,
@@ -136,19 +177,18 @@ wss.on('connection', (ws) => {
       case 'shoot': {
         if (!player.alive) break;
         const now = Date.now();
-        if (now - (player.lastShot || 0) < SHOOT_INTERVAL_MS) break;
+        if (now - player.lastShot < SHOOT_INTERVAL_MS) break;
         player.lastShot = now;
 
         const { ox, oy, oz, dx, dy, dz } = msg;
+        if ([ox, oy, oz, dx, dy, dz].some(v => !isFinite(+v))) break;
 
-        // Server-side hit detection against all other players
         let hitId = null, hitDist = Infinity;
         for (const [pid, p] of players) {
           if (pid === id || !p.alive || !p.snap) continue;
-          // Use head position (snap.y + 60 = eye height)
           const cx = p.snap.x, cy = p.snap.y + 36, cz = p.snap.z;
-          if (rayHitsSphere(ox, oy, oz, dx, dy, dz, cx, cy, cz, HIT_RADIUS)) {
-            const dist = Math.sqrt((ox-cx)**2 + (oy-cy)**2 + (oz-cz)**2);
+          if (rayHitsSphere(+ox, +oy, +oz, +dx, +dy, +dz, cx, cy, cz, HIT_RADIUS)) {
+            const dist = Math.sqrt((+ox-cx)**2 + (+oy-cy)**2 + (+oz-cz)**2);
             if (dist < hitDist) { hitDist = dist; hitId = pid; }
           }
         }
@@ -158,33 +198,24 @@ wss.on('connection', (ws) => {
           target.hp = Math.max(0, target.hp - BULLET_DAMAGE);
 
           if (target.hp <= 0) {
-            // Kill
-            target.alive = false;
+            target.alive  = false;
             target.deaths++;
             player.kills++;
-
             broadcastAll({ type: 'kill', killerId: id, victimId: hitId,
               killerName: player.name, victimName: target.name });
-
-            // Auto-respawn after delay
             setTimeout(() => {
               const t = players.get(hitId);
               if (t) {
-                t.hp = START_HP;
-                t.alive = true;
+                t.hp = START_HP; t.alive = true;
                 send(t.ws, { type: 'respawn', hp: START_HP });
                 broadcastAll({ type: 'playerHp', id: hitId, hp: START_HP });
               }
             }, RESPAWN_DELAY);
-
           } else {
-            // Damage
             broadcastAll({ type: 'dmg', targetId: hitId, shooterId: id,
               damage: BULLET_DAMAGE, hp: target.hp });
             send(target.ws, { type: 'hurt', damage: BULLET_DAMAGE, hp: target.hp });
           }
-
-          // Confirm hit to shooter
           send(ws, { type: 'hitConfirm', targetId: hitId });
         }
         break;
@@ -192,10 +223,10 @@ wss.on('connection', (ws) => {
 
       case 'meta': {
         if (msg.name && typeof msg.name === 'string') {
-          player.name = msg.name.slice(0, 20).replace(/[<>]/g, '');
+          player.name  = msg.name.slice(0, 24).replace(/[<>"]/g, '');
         }
         if (msg.color && typeof msg.color === 'string') {
-          player.color = msg.color.replace(/[^0-9a-fA-F#]/g, '').slice(0, 7);
+          player.color = (msg.color.match(/^#[0-9a-fA-F]{6}$/)?.[0]) ?? player.color;
         }
         broadcast(id, { type: 'meta', id, name: player.name, color: player.color });
         break;
@@ -204,17 +235,18 @@ wss.on('connection', (ws) => {
       case 'finish': {
         if (!player.alive) break;
         const timeSec = parseFloat(msg.time);
+        const mapId   = String(msg.map_id || 'map_01').slice(0, 32);
         if (isNaN(timeSec) || timeSec < MIN_FINISH_TIME) break;
-        console.log(`[Finish] ${player.name}: ${timeSec.toFixed(3)}s`);
-        recordFinish(player.name, timeSec);
-        broadcastAll({ type: 'finish', id, name: player.name, time: timeSec });
-        broadcastLeaderboard();
+        console.log(`[Finish] ${player.name} on ${mapId}: ${timeSec.toFixed(3)}s`);
+        recordWsFinish(player.name, mapId, timeSec);
+        broadcastAll({ type: 'finish', id, name: player.name, mapId, time: timeSec });
+        broadcastAll({ type: 'leaderboard', list: wsLeaderboard.slice(0, MAX_LEADERBOARD) });
         break;
       }
 
       case 'chat': {
         if (msg.text && typeof msg.text === 'string') {
-          const text = msg.text.slice(0, 120).replace(/[<>]/g, '');
+          const text = msg.text.slice(0, 120).replace(/[<>"]/g, '');
           broadcastAll({ type: 'chat', id, name: player.name, text });
         }
         break;
