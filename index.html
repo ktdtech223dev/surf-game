@@ -59,6 +59,20 @@
       top: 7px; left: 0;
     }
 
+    /* ── Hit marker (over crosshair) ───────────────────────── */
+    #hit-marker {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 22px; height: 22px;
+      border: 2px solid #00cfff;
+      border-radius: 50%;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 0 8px rgba(0,207,255,0.8);
+      transition: opacity 0.08s;
+    }
+
     /* ── Click-to-start overlay ────────────────────────────── */
     #instructions {
       position: absolute;
@@ -95,7 +109,7 @@
       50%       { opacity: 1.0; }
     }
 
-    /* ── Speed vignette (grows with speed) ─────────────────── */
+    /* ── Speed vignette ────────────────────────────────────── */
     #speed-vignette {
       position: absolute;
       inset: 0;
@@ -109,13 +123,171 @@
       transition: opacity 0.25s;
     }
 
-    /* ── Player count badge ────────────────────────────────── */
+    /* ── Damage vignette (brief red flash on hurt) ──────────── */
+    #damage-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 40%,
+        rgba(255, 30, 0, 0.45) 100%
+      );
+      transition: opacity 0.08s;
+    }
+
+    /* ── Player count badge ─────────────────────────────────── */
     #player-badge {
       position: absolute;
       top: 10px; right: 10px;
       font-size: 11px;
       color: #445;
       font-family: 'Consolas', monospace;
+    }
+
+    /* ── Health bar (bottom center) ─────────────────────────── */
+    #health-bar-wrap {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      text-align: center;
+    }
+    #health-label {
+      font-size: 11px;
+      color: #445;
+      margin-bottom: 3px;
+    }
+    #health-bar-bg {
+      width: 200px;
+      height: 8px;
+      background: #111;
+      border-radius: 4px;
+      border: 1px solid #222;
+      overflow: hidden;
+    }
+    #health-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: #0f0;
+      border-radius: 4px;
+      transition: width 0.15s, background 0.15s;
+    }
+    #health-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #0f0;
+      margin-top: 3px;
+      text-shadow: 0 0 6px rgba(0,255,0,0.4);
+    }
+
+    /* ── Weapon HUD (bottom right) ──────────────────────────── */
+    #weapon-hud {
+      position: absolute;
+      bottom: 110px;
+      right: 200px;
+      text-align: right;
+    }
+    #ammo-display {
+      font-size: 22px;
+      text-shadow: 0 0 6px rgba(0,207,255,0.3);
+    }
+    #reload-indicator {
+      display: none;
+      font-size: 11px;
+      color: #fa0;
+      margin-top: 2px;
+    }
+    #reload-indicator::after {
+      content: '';
+      display: block;
+      height: 3px;
+      background: #333;
+      border-radius: 2px;
+      margin-top: 3px;
+      width: 80px;
+      position: relative;
+    }
+    #reload-progress {
+      height: 3px;
+      background: #fa0;
+      border-radius: 2px;
+      width: 0%;
+      margin-top: 2px;
+      transition: width 0.1s linear;
+    }
+
+    /* ── Kill feed (top right, below badge) ─────────────────── */
+    #kill-feed {
+      position: absolute;
+      top: 34px; right: 10px;
+      width: 300px;
+      text-align: right;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .kf-entry {
+      display: block;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+      margin-bottom: 2px;
+    }
+
+    /* ── Chat overlay ───────────────────────────────────────── */
+    #chat-wrap {
+      position: absolute;
+      bottom: 115px;
+      left: 10px;
+      width: 380px;
+      pointer-events: none;
+    }
+    #chat-messages {
+      max-height: 120px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 2px;
+    }
+    .chat-line {
+      font-size: 12px;
+      color: #ccc;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-line .chat-name { color: #00cfff; }
+    #chat-input-wrap {
+      display: none;
+      margin-top: 4px;
+      pointer-events: auto;
+    }
+    #chat-input {
+      width: 100%;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid #224;
+      color: #0f0;
+      font: 13px 'Consolas', monospace;
+      padding: 4px 8px;
+      outline: none;
+      border-radius: 3px;
+    }
+    #chat-input-wrap.open { display: block; }
+
+    /* ── Scoreboard overlay (Tab key) ───────────────────────── */
+    #scoreboard {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,4,12,0.92);
+      border: 1px solid #0a2040;
+      padding: 20px 28px;
+      min-width: 340px;
+      border-radius: 6px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      color: #ccc;
     }
   </style>
 </head>
@@ -125,13 +297,45 @@
     <canvas id="speed-graph" width="280" height="90"></canvas>
     <canvas id="tick-graph"  width="180" height="90"></canvas>
     <div id="crosshair"></div>
+    <div id="hit-marker"></div>
     <div id="speed-vignette"></div>
+    <div id="damage-vignette"></div>
     <div id="player-badge">⬡ 1 online</div>
+
+    <!-- Health bar -->
+    <div id="health-bar-wrap">
+      <div id="health-label">HP</div>
+      <div id="health-bar-bg"><div id="health-bar-fill"></div></div>
+      <div id="health-value">100</div>
+    </div>
+
+    <!-- Weapon HUD -->
+    <div id="weapon-hud">
+      <div id="ammo-display"><span style="color:#0cf;font-weight:bold">30</span><span style="color:#334"> / 30</span></div>
+      <div id="reload-indicator">
+        RELOADING
+        <div id="reload-progress"></div>
+      </div>
+    </div>
+
+    <!-- Kill feed -->
+    <div id="kill-feed"></div>
+
+    <!-- Chat -->
+    <div id="chat-wrap">
+      <div id="chat-messages"></div>
+      <div id="chat-input-wrap">
+        <input id="chat-input" type="text" maxlength="120" placeholder="Say something… (Enter to send, Esc to cancel)" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- Scoreboard -->
+    <div id="scoreboard"></div>
 
     <div id="instructions">
       <h1>SURF</h1>
-      <p>WASD &nbsp;·&nbsp; Mouse Look &nbsp;·&nbsp; Space Jump</p>
-      <p style="color:#556;font-size:12px">Walk to the side ledge → step onto the ramp face → A/D + sweep mouse to gain speed</p>
+      <p>WASD &nbsp;·&nbsp; Mouse Look &nbsp;·&nbsp; Space Jump &nbsp;·&nbsp; LMB Shoot</p>
+      <p style="color:#556;font-size:12px">Tab: scoreboard &nbsp;·&nbsp; Enter: chat &nbsp;·&nbsp; R: reload</p>
       <div class="click-prompt">Click to start</div>
     </div>
   </div>

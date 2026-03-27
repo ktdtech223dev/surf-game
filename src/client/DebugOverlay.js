@@ -83,10 +83,15 @@ export class DebugOverlay {
         </div>`;
     }
 
+    // HP display
+    const hp    = extra.hp ?? 100;
+    const hpCol = hp > 50 ? '#0f0' : hp > 25 ? '#fa0' : '#f44';
+    const ping  = extra.ping ?? 0;
+
     // Player count / connection
     const count = extra.playerCount ?? 1;
     const connDot = extra.connected
-      ? '<span style="color:#0f0">●</span>'
+      ? `<span style="color:#0f0">●</span> <span style="color:#334;font-size:10px">${ping}ms</span>`
       : '<span style="color:#333">●</span>';
 
     // Update badge in top-right

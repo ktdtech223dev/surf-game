@@ -8,10 +8,22 @@
       "port": 3000
     },
     {
-      "name": "git-commit",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "cd /d E:\\SurfGame && git config user.email \"surf@game.dev\" && git config user.name \"SurfGame\" && git add -A && git commit -m \"Polished surf game playtesting build\""],
+      "name": "deploy-helper",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\deploy-helper.mjs"],
       "port": 3001
+    },
+    {
+      "name": "build-helper",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\build-helper.mjs"],
+      "port": 3005
+    },
+    {
+      "name": "git-push",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\git-push.mjs"],
+      "port": 3006
     },
     {
       "name": "railway-install",
