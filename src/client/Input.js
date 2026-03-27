@@ -15,6 +15,7 @@ export class InputManager {
     // UI toggles
     this.scoreboardOpen = false;
     this.chatOpen       = false;
+    this.menuOpen       = false; // true while any overlay (main menu / pause) is visible
 
     this._bind();
   }
@@ -70,7 +71,7 @@ export class InputManager {
   }
 
   _onClick() {
-    if (!this.locked) document.body.requestPointerLock();
+    if (!this.locked && !this.menuOpen) document.body.requestPointerLock();
   }
 
   _onPointerLockChange() {

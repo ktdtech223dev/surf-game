@@ -61,7 +61,7 @@ export class KnifeSystem {
     this._mesh      = null;
     this._inspecting = false;
     this._inspectT  = 0;
-    this._basePos   = new THREE.Vector3(0.4, -0.35, -0.6);
+    this._basePos   = new THREE.Vector3(0.55, -0.45, -1.2);
     this._inspectRot = 0;
 
     this._buildKnifeMesh(0x888888);
@@ -126,7 +126,7 @@ export class KnifeSystem {
     } else {
       // Idle bob
       this._inspectT += dt;
-      const bob = Math.sin(this._inspectT * 2.5) * 0.008;
+      const bob = Math.sin(this._inspectT * 2.5) * 0.02;
       this._mesh.position.copy(this._basePos).add(new THREE.Vector3(0, bob, 0));
       this._mesh.rotation.set(0.1, Math.PI * 0.15, 0.05);
     }
@@ -145,37 +145,35 @@ export class KnifeSystem {
   }
 
   _buildKnifeMesh(color) {
-    // Simple low-poly knife: blade + handle
+    // Low-poly knife sized for game units (eye height = 56 units, 1 unit ≈ 3 cm)
     const group = new THREE.Group();
 
-    // Blade
-    const bladeGeo = new THREE.BoxGeometry(0.04, 0.018, 0.28);
-    const bladeMat = new THREE.MeshLambertMaterial({ color, flatShading: true });
-    const blade    = new THREE.Mesh(bladeGeo, bladeMat);
-    blade.position.z = -0.1;
+    const bladeMat  = new THREE.MeshLambertMaterial({ color, flatShading: true });
+    const handleMat = new THREE.MeshLambertMaterial({ color: 0x222222, flatShading: true });
+    const guardMat  = new THREE.MeshLambertMaterial({ color: 0x555555, flatShading: true });
 
-    // Tip
-    const tipGeo = new THREE.ConeGeometry(0.012, 0.06, 4);
-    const tip    = new THREE.Mesh(tipGeo, bladeMat);
+    // Blade  — 0.25 wide × 0.08 tall × 2.0 long
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.08, 2.0), bladeMat);
+    blade.position.z = -0.8;   // center of blade from group origin
+
+    // Tip cone
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.5, 4), bladeMat);
     tip.rotation.x = Math.PI / 2;
-    tip.position.z = -0.27;
+    tip.position.z = -1.95;
 
     // Handle
-    const handleGeo = new THREE.CylinderGeometry(0.012, 0.014, 0.12, 6);
-    const handleMat = new THREE.MeshLambertMaterial({ color: 0x222222, flatShading: true });
-    const handle    = new THREE.Mesh(handleGeo, handleMat);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.10, 0.9, 6), handleMat);
     handle.rotation.x = Math.PI / 2;
-    handle.position.z  = 0.07;
+    handle.position.z  = 0.5;
 
-    // Guard
-    const guardGeo = new THREE.BoxGeometry(0.09, 0.025, 0.015);
-    const guard    = new THREE.Mesh(guardGeo, handleMat);
-    guard.position.z = 0.01;
+    // Guard (cross-piece)
+    const guard = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.12), guardMat);
+    guard.position.z = 0.02;
 
     group.add(blade, tip, handle, guard);
     group.position.copy(this._basePos);
     group.rotation.set(0.1, Math.PI * 0.15, 0.05);
-    group.scale.setScalar(2.5);
+    group.scale.setScalar(1.0);
 
     this._mesh = group;
     this.camera.add(group);

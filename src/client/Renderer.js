@@ -10,7 +10,7 @@ const FOV_SMOOTH     = 0.08;
 export class Renderer {
   constructor() {
     this.scene    = new THREE.Scene();
-    this.camera   = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 1, 14000);
+    this.camera   = new THREE.PerspectiveCamera(BASE_FOV, window.innerWidth / window.innerHeight, 0.5, 14000);
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
 
     this.renderer.setSize(window.innerWidth, window.innerHeight);

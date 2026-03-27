@@ -22,6 +22,7 @@ import { GhostSystem }       from './GhostSystem.js';
 import { AchievementSystem } from './AchievementSystem.js';
 import { KnifeSystem }       from './KnifeSystem.js';
 import { ChallengeSystem }   from './ChallengeSystem.js';
+import { PauseMenu }         from './PauseMenu.js';
 import { MAP_CATALOG, MAP_BY_ID, MAPS_BY_DIFF } from './MapCatalog.js';
 import { buildTestMap, getSpawnPosition, MAP as MAP01 } from './MapBuilder.js';
 import { createPlayerState, simulateTick } from '../shared/physics/MovementEngine.js';
@@ -76,9 +77,15 @@ document.getElementById('settings-btn')?.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && input.locked && !input.chatOpen) {
-    if (settings.isPanelOpen()) settings.closePanel();
-    else settings.openPanel();
+  if (e.code === 'Escape' && !input.chatOpen) {
+    if (settings.isPanelOpen()) {
+      settings.closePanel();
+    } else if (pauseMenu.visible) {
+      pauseMenu.hide();
+      renderer.renderer.domElement.requestPointerLock?.();
+    } else if (input.locked) {
+      pauseMenu.show();
+    }
   }
   // F key: knife inspect
   if (e.code === 'KeyF' && input.locked && !input.chatOpen) {
@@ -86,7 +93,6 @@ document.addEventListener('keydown', (e) => {
   }
   // M key: open main menu
   if (e.code === 'KeyM' && input.locked && !input.chatOpen && !settings.isPanelOpen()) {
-    document.exitPointerLock?.();
     mainMenu.show();
   }
 });
@@ -263,7 +269,21 @@ const mainMenu = new MainMenu(async (mapId) => {
   await _loadMap(mapId);
   // Re-lock pointer after menu closes
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
-});
+}, input);
+
+// ── Pause menu ────────────────────────────────────────────────────────────────
+const pauseMenu = new PauseMenu(input);
+pauseMenu.onResume    = () => { renderer.renderer.domElement.requestPointerLock?.(); };
+pauseMenu.onChangeMap = async (mapId) => {
+  await _loadMap(mapId);
+  setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
+};
+pauseMenu.onMainMenu  = () => { mainMenu.show(); };
+pauseMenu.onSettings  = () => {
+  // Re-lock first so settings panel opens in game context
+  renderer.renderer.domElement.requestPointerLock?.();
+  setTimeout(() => settings.openPanel(), 150);
+};
 
 // ── Network callbacks ──────────────────────────────────────────────────────────
 net.onWelcome = (id, name) => {

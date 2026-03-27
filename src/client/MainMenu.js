@@ -7,8 +7,9 @@ import { MAP_CATALOG, MAPS_BY_DIFF, DIFFICULTY } from './MapCatalog.js';
 import { KNIFE_DEFS, KNIFE_BY_ID } from './KnifeSystem.js';
 
 export class MainMenu {
-  constructor(onPlayMap) {
+  constructor(onPlayMap, input = null) {
     this._onPlayMap  = onPlayMap; // callback(mapId)
+    this._input      = input;     // InputManager — used to block pointer lock while menu is open
     this._el         = null;
     this._visible    = false;
     this._tab        = 'play';   // 'play' | 'loadout' | 'leaderboard' | 'settings'
@@ -22,6 +23,8 @@ export class MainMenu {
 
   async show() {
     this._visible = true;
+    if (this._input) this._input.menuOpen = true;
+    document.exitPointerLock?.();
     await this._loadUnlocks();
     this._build();
     this._el.style.display = 'flex';
@@ -30,6 +33,7 @@ export class MainMenu {
 
   hide() {
     this._visible = false;
+    if (this._input) this._input.menuOpen = false;
     if (this._el) this._el.style.display = 'none';
   }
 
