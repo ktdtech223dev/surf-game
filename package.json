@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "3D multiplayer surf game with Source-like movement",
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
