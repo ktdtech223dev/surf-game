@@ -7,12 +7,14 @@ import { MAP_CATALOG, MAPS_BY_DIFF, DIFFICULTY } from './MapCatalog.js';
 import { KNIFE_DEFS, KNIFE_BY_ID } from './KnifeSystem.js';
 
 export class MainMenu {
-  constructor(onPlayMap, input = null) {
+  constructor(onPlayMap, input = null, net = null) {
     this._onPlayMap  = onPlayMap; // callback(mapId)
     this._input      = input;     // InputManager — used to block pointer lock while menu is open
+    this._net        = net;       // NetworkClient — for lobby state
+    this.onJoinOnline = null;     // set by main.js
     this._el         = null;
     this._visible    = false;
-    this._tab        = 'play';   // 'play' | 'loadout' | 'leaderboard' | 'settings'
+    this._tab        = 'play';   // 'play' | 'online' | 'loadout' | 'leaderboard' | 'settings'
     this._ownedKnives= new Set(['knife_default']);
     this._ownedSkins = new Set(['skin_default']);
     this._equippedKnife = 'knife_default';
@@ -70,7 +72,7 @@ export class MainMenu {
 
         <!-- Tabs -->
         <div style="display:flex;gap:4px;margin-bottom:20px;justify-content:center">
-          ${['play','loadout','leaderboard','settings'].map(t => `
+          ${['play','online','loadout','leaderboard','settings'].map(t => `
             <button onclick="window._menuTab('${t}')" style="
               padding:8px 20px; border:1px solid ${this._tab===t?'#00cfff':'#333'};
               background:${this._tab===t?'rgba(0,207,255,0.12)':'transparent'};
@@ -83,6 +85,7 @@ export class MainMenu {
         <!-- Tab content -->
         <div id="menu-content">
           ${this._tab === 'play'        ? this._renderPlay()        : ''}
+          ${this._tab === 'online'      ? this._renderOnline()      : ''}
           ${this._tab === 'loadout'     ? this._renderLoadout()     : ''}
           ${this._tab === 'leaderboard' ? this._renderLeaderboard() : ''}
           ${this._tab === 'settings'    ? this._renderSettings()    : ''}
@@ -92,6 +95,8 @@ export class MainMenu {
 
     // Wire tab switcher
     window._menuTab = (tab) => { this._tab = tab; this._renderTab(); };
+    // Wire online join
+    window._menuJoinOnline = () => { if (this.onJoinOnline) this.onJoinOnline(); };
     // Wire play button
     window._menuPlayMap = (mapId) => {
       this._onPlayMap(mapId);
@@ -113,6 +118,54 @@ export class MainMenu {
       await ds.updateProfile({ color: inp.value });
       this._renderTab();
     };
+  }
+
+  // ── Tab: Online lobby ─────────────────────────────────────────────────────
+
+  _renderOnline() {
+    const s = this._net?.lobbyState ?? null;
+    const secLeft = s ? Math.max(0, Math.ceil((s.nextRotateAt - Date.now()) / 1000)) : 600;
+    const min = String(Math.floor(secLeft / 60)).padStart(2,'0');
+    const sec = String(secLeft % 60).padStart(2,'0');
+    const players = s?.playerCount ?? '...';
+    const mapName = (s?.mapId ?? '...').replace(/_/g,' ').toUpperCase();
+    const votes = s?.skipVotes ?? 0;
+    const needed = s?.skipNeeded ?? 1;
+
+    return `
+      <div style="max-width:500px;margin:0 auto;text-align:center;padding:20px 0">
+        <div style="font-size:11px;letter-spacing:4px;color:#555;margin-bottom:24px">ONLINE LOBBY</div>
+
+        <div style="border:1px solid #1a1a2a;border-radius:8px;padding:24px;margin-bottom:20px">
+          <div style="color:#555;font-size:10px;letter-spacing:2px;margin-bottom:8px">CURRENT MAP</div>
+          <div style="font-size:20px;font-weight:bold;color:#00cfff;margin-bottom:4px">${_esc(mapName)}</div>
+          <div style="color:#444;font-size:11px">next rotation in <b style="color:#888">${min}:${sec}</b></div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px">
+          <div style="border:1px solid #111;border-radius:6px;padding:12px 20px;min-width:100px">
+            <div style="font-size:22px;font-weight:bold;color:#fff">${players}</div>
+            <div style="font-size:10px;color:#444;margin-top:2px">PLAYERS ONLINE</div>
+          </div>
+          <div style="border:1px solid #111;border-radius:6px;padding:12px 20px;min-width:100px">
+            <div style="font-size:22px;font-weight:bold;color:#fff">${votes}/${needed}</div>
+            <div style="font-size:10px;color:#444;margin-top:2px">SKIP VOTES</div>
+          </div>
+        </div>
+
+        <button onclick="window._menuJoinOnline()" style="
+          width:100%;padding:16px 0;background:rgba(0,207,255,0.12);
+          border:1px solid #00cfff;color:#00cfff;cursor:pointer;
+          font-family:monospace;font-size:16px;letter-spacing:2px;border-radius:6px;
+          margin-bottom:12px;
+        ">&#9654;  JOIN LOBBY</button>
+
+        <div style="color:#333;font-size:10px;letter-spacing:1px">
+          Joins the shared server — map rotates every 10 minutes<br>
+          Maps chosen at random &middot; Procedural maps possible
+        </div>
+      </div>
+    `;
   }
 
   // ── Tab: Play (map select) ─────────────────────────────────────────────────

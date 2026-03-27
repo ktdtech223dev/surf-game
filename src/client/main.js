@@ -28,6 +28,25 @@ import { buildTestMap, getSpawnPosition, MAP as MAP01 } from './MapBuilder.js';
 import { createPlayerState, simulateTick } from '../shared/physics/MovementEngine.js';
 import { TICK_RATE, TICK_INTERVAL }         from '../shared/physics/constants.js';
 import * as Vec3 from '../shared/physics/vec3.js';
+import { generateProceduralEntry } from './ProceduralMapGen.js';
+
+// ── Clear map geometry from scene (preserves permanent objects) ────────────────
+function _clearMap(scene) {
+  const toRemove = [];
+  scene.children.forEach(child => {
+    if (child.userData.permanent) return;
+    if (child.isCamera) return;
+    toRemove.push(child);
+  });
+  toRemove.forEach(child => {
+    child.traverse(o => {
+      o.geometry?.dispose();
+      if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+      else o.material?.dispose();
+    });
+    scene.remove(child);
+  });
+}
 
 // Expose catalog for AchievementSystem difficulty checks
 window._mapCatalog = { MAP_CATALOG, MAPS_BY_DIFF };
@@ -54,6 +73,13 @@ const playerState = createPlayerState();
 let collisionWorld = null;
 let activeMap = MAP01;   // MAP descriptor (FINISH_Z, FINISH_Y, etc.)
 let activeMapId = 'map_01';
+
+// ── Mode ───────────────────────────────────────────────────────────────────────
+let _mode = 'solo'; // 'solo' | 'online'
+
+// ── Online lobby state ─────────────────────────────────────────────────────────
+let _lobbyState = null;
+let _onlineHudEl = null;
 
 // ── Apply local settings (SettingsManager = in-game panel, DS = server-side) ──
 input.sensitivity = settings.sensitivity;
@@ -228,6 +254,9 @@ async function _loadMap(mapId) {
   bestRunSec  = null;
   _resetSplits();
 
+  // Clear existing map geometry before loading new one
+  _clearMap(renderer.scene);
+
   let world;
   if (mapId === 'map_01') {
     // Use original hand-crafted map for map_01
@@ -238,9 +267,15 @@ async function _loadMap(mapId) {
     renderer.scene.fog = new THREE.Fog(0x0a1020, 800, 3000);
     world = collisionWorld;
   } else {
+    // MapFactory handles both catalog maps and proc_ maps
     const result = MapFactory.build(mapId, renderer.scene);
     collisionWorld = result.collisionWorld;
     activeMap = result.mapDesc;
+  }
+
+  // Re-add camera if it was removed during scene clear
+  if (!renderer.scene.getObjectById(renderer.camera.id)) {
+    renderer.scene.add(renderer.camera);
   }
 
   // Set spawn position
@@ -262,14 +297,83 @@ async function _loadMap(mapId) {
     ghostSys.loadTopGhost(mapId).catch(() => {});
     ghostSys.startRecording();
   }
+
+  _updateOnlineHud();
+}
+
+// ── Online lobby HUD helpers ───────────────────────────────────────────────────
+function _createOnlineHud() {
+  if (_onlineHudEl) return;
+  const el = document.createElement('div');
+  el.id = 'online-hud';
+  el.style.cssText = `
+    position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    display:none; align-items:center; gap:12px;
+    background:rgba(0,0,0,0.75); border:1px solid #00cfff33;
+    border-radius:20px; padding:6px 16px;
+    font-family:monospace; font-size:11px; color:#888; z-index:500;
+    pointer-events:auto;
+  `;
+  document.body.appendChild(el);
+  _onlineHudEl = el;
+}
+
+function _updateOnlineHud() {
+  if (!_onlineHudEl) return;
+  if (_mode !== 'online') { _onlineHudEl.style.display = 'none'; return; }
+  _onlineHudEl.style.display = 'flex';
+  const s = _lobbyState;
+  const secLeft = s ? Math.max(0, Math.ceil((s.nextRotateAt - Date.now()) / 1000)) : 0;
+  const min = String(Math.floor(secLeft / 60)).padStart(2,'0');
+  const sec = String(secLeft % 60).padStart(2,'0');
+  const needed = s ? Math.ceil((s.playerCount || 1) * 0.51) : 1;
+  const votes = s?.skipVotes ?? 0;
+  _onlineHudEl.innerHTML = `
+    <span style="color:#00cfff">ONLINE</span>
+    <span>${s?.mapId?.replace('_',' ').toUpperCase() ?? '...'}</span>
+    <span style="color:#555">|</span>
+    <span>next map <b style="color:#fff">${min}:${sec}</b></span>
+    <span style="color:#555">|</span>
+    <button onclick="window._voteSkip()" style="
+      background:transparent; border:1px solid #555; color:#888;
+      padding:2px 8px; cursor:pointer; font-family:monospace; font-size:11px; border-radius:10px;
+    ">skip ${votes}/${needed}</button>
+  `;
+}
+
+window._voteSkip = () => { net.sendVoteSkip(); };
+
+function _showMapChangeNotice(mapId) {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position:fixed; top:40%; left:50%; transform:translate(-50%,-50%);
+    background:rgba(0,0,0,0.9); border:1px solid #00cfff;
+    color:#00cfff; font-family:monospace; font-size:18px; font-weight:bold;
+    padding:20px 40px; border-radius:8px; z-index:9000; text-align:center;
+    animation: fadeOut 0.4s 3s forwards;
+  `;
+  el.textContent = `MAP CHANGED: ${mapId.replace('_',' ').toUpperCase()}`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+async function _joinOnline() {
+  _mode = 'online';
+  const mapId = _lobbyState?.mapId ?? 'map_01';
+  await _loadMap(mapId);
+  mainMenu.hide();
+  _updateOnlineHud();
+  setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 }
 
 // ── Main menu integration ─────────────────────────────────────────────────────
 const mainMenu = new MainMenu(async (mapId) => {
+  _mode = 'solo';
   await _loadMap(mapId);
   // Re-lock pointer after menu closes
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
-}, input);
+}, input, net);
+mainMenu.onJoinOnline = _joinOnline;
 
 // ── Pause menu ────────────────────────────────────────────────────────────────
 const pauseMenu = new PauseMenu(input);
@@ -320,6 +424,19 @@ net.onChat        = (_, name, text) => { _addChatLine(name, text); sound.playCha
 net.onMetaUpdate  = (id, name, color) => { ghosts.setName(id, name); if (color) ghosts.setColor?.(id, color); scoreboard.upsert(id, { name }); };
 net.onFinish      = ({ name, time }) => { killFeed.addKill({ killerName: name, victimName: _fmtTime(time), killerId: -1, victimId: -1 }, net.id); };
 net.onLeaderboard = (list) => { scoreboard.updateLeaderboard(list); };
+net.onLobbyState = (state) => {
+  _lobbyState = state;
+  _updateOnlineHud();
+};
+net.onMapChange = async (mapId, nextRotateAt) => {
+  _lobbyState = { ..._lobbyState, mapId, nextRotateAt, skipVotes: 0 };
+  if (_mode === 'online') {
+    await _loadMap(mapId);
+    setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
+    _showMapChangeNotice(mapId);
+  }
+  _updateOnlineHud();
+};
 net.connect();
 
 // Weapon (after net connected)
@@ -461,6 +578,7 @@ async function initGame() {
   // Show main menu
   await mainMenu.show();
 
+  _createOnlineHud();
   requestAnimationFrame(gameLoop);
 }
 
@@ -516,6 +634,9 @@ function gameLoop(now) {
     const hSpeed = Vec3.lengthXZ(playerState.velocity);
     _checkSpeedAchieves(hSpeed);
   }
+
+  // Update online HUD timer every ~60 frames
+  if (tickCount % 60 === 0 && _mode === 'online') _updateOnlineHud();
 
   // Chat / scoreboard
   const inp2 = input.sample();

@@ -21,14 +21,18 @@ export class Renderer {
     document.body.prepend(this.renderer.domElement);
 
     // ── Lighting ──────────────────────────────────────────────
-    this.scene.add(new THREE.AmbientLight(0x8899cc, 0.75));
+    const ambLight = new THREE.AmbientLight(0x8899cc, 0.75);
+    ambLight.userData.permanent = true;
+    this.scene.add(ambLight);
 
     const sun = new THREE.DirectionalLight(0xffeedd, 1.1);
     sun.position.set(300, 800, 200);
+    sun.userData.permanent = true;
     this.scene.add(sun);
 
     const rim = new THREE.DirectionalLight(0x4466ff, 0.35);
     rim.position.set(-200, 100, -500);
+    rim.userData.permanent = true;
     this.scene.add(rim);
 
     // ── Fog ───────────────────────────────────────────────────
@@ -73,7 +77,9 @@ export class Renderer {
         }
       `,
     });
-    this.scene.add(new THREE.Mesh(skyGeo, skyMat));
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    skyMesh.userData.permanent = true;
+    this.scene.add(skyMesh);
   }
 
   _addStars() {
@@ -91,7 +97,9 @@ export class Renderer {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const mat = new THREE.PointsMaterial({ color: 0xaabbdd, size: 8, sizeAttenuation: true });
-    this.scene.add(new THREE.Points(geo, mat));
+    const starPoints = new THREE.Points(geo, mat);
+    starPoints.userData.permanent = true;
+    this.scene.add(starPoints);
   }
 
   _onResize() {
