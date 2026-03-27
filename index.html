@@ -289,6 +289,138 @@
       box-shadow: 0 0 40px rgba(0,0,0,0.8);
       color: #ccc;
     }
+
+    /* ── Name prompt (first launch) ─────────────────────────── */
+    #name-prompt {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 50;
+    }
+    #name-prompt h2 {
+      font-size: 22px;
+      color: #00cfff;
+      letter-spacing: 4px;
+    }
+    #name-prompt p { font-size: 13px; color: #556; }
+    #name-input {
+      background: rgba(0,0,0,0.7);
+      border: 1px solid #0a3050;
+      color: #0f0;
+      font: 16px 'Consolas', monospace;
+      padding: 8px 16px;
+      width: 260px;
+      text-align: center;
+      outline: none;
+      border-radius: 4px;
+      letter-spacing: 2px;
+    }
+    #name-input:focus { border-color: #00cfff; }
+    #name-submit {
+      background: #003850;
+      border: 1px solid #00cfff;
+      color: #00cfff;
+      font: 13px 'Consolas', monospace;
+      padding: 8px 28px;
+      cursor: pointer;
+      border-radius: 3px;
+      letter-spacing: 2px;
+      pointer-events: auto;
+    }
+    #name-submit:hover { background: #005070; }
+
+    /* ── Settings panel (Escape key) ────────────────────────── */
+    #settings-panel {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+      pointer-events: auto;
+    }
+    #settings-inner {
+      background: rgba(0,4,14,0.96);
+      border: 1px solid #0a2040;
+      padding: 28px 36px;
+      min-width: 360px;
+      border-radius: 6px;
+      color: #ccc;
+      font-size: 13px;
+    }
+    #settings-inner h2 {
+      color: #00cfff;
+      font-size: 14px;
+      letter-spacing: 4px;
+      margin-bottom: 22px;
+    }
+    .cfg-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .cfg-label { color: #556; font-size: 12px; width: 110px; }
+    .cfg-value { color: #0cf; font-size: 12px; width: 54px; text-align: right; }
+    .cfg-slider {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 3px;
+      background: #0a2030;
+      border-radius: 2px;
+      outline: none;
+    }
+    .cfg-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #00cfff;
+      cursor: pointer;
+    }
+    #cfg-name {
+      flex: 1;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid #0a2030;
+      color: #0f0;
+      font: 13px 'Consolas', monospace;
+      padding: 5px 10px;
+      outline: none;
+      border-radius: 3px;
+    }
+    #cfg-name:focus { border-color: #00cfff; }
+    #cfg-close {
+      margin-top: 20px;
+      background: transparent;
+      border: 1px solid #0a2040;
+      color: #556;
+      font: 12px 'Consolas', monospace;
+      padding: 7px 20px;
+      cursor: pointer;
+      border-radius: 3px;
+      width: 100%;
+      letter-spacing: 2px;
+    }
+    #cfg-close:hover { border-color: #00cfff; color: #00cfff; }
+
+    /* ── Settings gear button ────────────────────────────────── */
+    #settings-btn {
+      position: absolute;
+      bottom: 112px; right: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      color: #223;
+      pointer-events: auto;
+      user-select: none;
+      transition: color 0.2s;
+    }
+    #settings-btn:hover { color: #00cfff; }
   </style>
 </head>
 <body>
@@ -331,6 +463,44 @@
 
     <!-- Scoreboard -->
     <div id="scoreboard"></div>
+
+    <!-- Settings gear -->
+    <div id="settings-btn" title="Settings (Esc)">⚙</div>
+
+    <!-- Name prompt (first launch) -->
+    <div id="name-prompt">
+      <h2>SURF</h2>
+      <p>Enter your name to join</p>
+      <input id="name-input" type="text" maxlength="20" placeholder="Your name" autocomplete="off" spellcheck="false">
+      <button id="name-submit">PLAY</button>
+    </div>
+
+    <!-- Settings panel -->
+    <div id="settings-panel">
+      <div id="settings-inner">
+        <h2>SETTINGS</h2>
+        <div class="cfg-row">
+          <span class="cfg-label">NAME</span>
+          <input id="cfg-name" type="text" maxlength="20" spellcheck="false">
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">SENSITIVITY</span>
+          <input id="cfg-sensitivity" class="cfg-slider" type="range" min="0.0005" max="0.006" step="0.0001" value="0.002">
+          <span id="cfg-sensitivity-label" class="cfg-value">0.0020</span>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">FOV</span>
+          <input id="cfg-fov" class="cfg-slider" type="range" min="70" max="120" step="1" value="90">
+          <span id="cfg-fov-label" class="cfg-value">90</span>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">VOLUME</span>
+          <input id="cfg-volume" class="cfg-slider" type="range" min="0" max="1" step="0.05" value="0.7">
+          <span id="cfg-volume-label" class="cfg-value">70%</span>
+        </div>
+        <button id="cfg-close">CLOSE (ESC)</button>
+      </div>
+    </div>
 
     <div id="instructions">
       <h1>SURF</h1>

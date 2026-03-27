@@ -39,9 +39,16 @@ export class Renderer {
     this._addStars();
 
     this.velocityArrow = null;
+    this._baseFov      = BASE_FOV;
     this._targetFov    = BASE_FOV;
 
     window.addEventListener('resize', () => this._onResize());
+  }
+
+  /** Change base FOV (from settings) */
+  setFOV(fov) {
+    this._baseFov   = Math.max(60, Math.min(130, fov));
+    this._targetFov = this._baseFov;
   }
 
   _addSkybox() {
@@ -138,7 +145,7 @@ export class Renderer {
 
     // Dynamic FOV scales with horizontal speed
     const fovBonus   = MAX_FOV_BONUS * Math.min(1, speed / FOV_SPEED_SCALE);
-    this._targetFov  = BASE_FOV + fovBonus;
+    this._targetFov  = this._baseFov + fovBonus;
     this.camera.fov += (this._targetFov - this.camera.fov) * FOV_SMOOTH;
     this.camera.updateProjectionMatrix();
   }
