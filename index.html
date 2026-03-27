@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SURF</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    canvas { display: block; }
+
+    #ui-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      font-family: 'Consolas', 'Courier New', monospace;
+      z-index: 10;
+    }
+
+    /* ── Debug HUD ─────────────────────────────────────────── */
+    #debug-hud {
+      position: absolute;
+      top: 10px; left: 10px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #0f0;
+      text-shadow: 0 0 4px rgba(0,0,0,0.9);
+    }
+
+    /* ── Speed / tick graphs ───────────────────────────────── */
+    #speed-graph {
+      position: absolute;
+      bottom: 10px; left: 10px;
+    }
+    #tick-graph {
+      position: absolute;
+      bottom: 10px; right: 10px;
+    }
+
+    /* ── Crosshair ─────────────────────────────────────────── */
+    #crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px; height: 16px;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.75);
+    }
+    #crosshair::before {
+      width: 1px; height: 16px;
+      left: 7px; top: 0;
+    }
+    #crosshair::after {
+      width: 16px; height: 1px;
+      top: 7px; left: 0;
+    }
+
+    /* ── Click-to-start overlay ────────────────────────────── */
+    #instructions {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -60%);
+      color: #fff;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+      pointer-events: none;
+    }
+    #instructions h1 {
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      color: #00cfff;
+      text-shadow: 0 0 30px rgba(0,207,255,0.6);
+      margin-bottom: 8px;
+    }
+    #instructions p {
+      font-size: 15px;
+      color: #aaa;
+      margin-bottom: 4px;
+    }
+    #instructions .click-prompt {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #fff;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    #instructions.hidden { display: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1.0; }
+    }
+
+    /* ── Speed vignette (grows with speed) ─────────────────── */
+    #speed-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 180, 255, 0.18) 100%
+      );
+      transition: opacity 0.25s;
+    }
+
+    /* ── Player count badge ────────────────────────────────── */
+    #player-badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      font-size: 11px;
+      color: #445;
+      font-family: 'Consolas', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="ui-overlay">
+    <div id="debug-hud"></div>
+    <canvas id="speed-graph" width="280" height="90"></canvas>
+    <canvas id="tick-graph"  width="180" height="90"></canvas>
+    <div id="crosshair"></div>
+    <div id="speed-vignette"></div>
+    <div id="player-badge">⬡ 1 online</div>
+
+    <div id="instructions">
+      <h1>SURF</h1>
+      <p>WASD &nbsp;·&nbsp; Mouse Look &nbsp;·&nbsp; Space Jump</p>
+      <p style="color:#556;font-size:12px">Walk to the side ledge → step onto the ramp face → A/D + sweep mouse to gain speed</p>
+      <div class="click-prompt">Click to start</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/client/main.js"></script>
+</body>
+</html>

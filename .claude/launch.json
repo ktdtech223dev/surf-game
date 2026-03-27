@@ -1,0 +1,35 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "surf-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "git-commit",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d E:\\SurfGame && git config user.email \"surf@game.dev\" && git config user.name \"SurfGame\" && git add -A && git commit -m \"Polished surf game playtesting build\""],
+      "port": 3001
+    },
+    {
+      "name": "railway-install",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "npm install -g @railway/cli"],
+      "port": 3002
+    },
+    {
+      "name": "railway-login",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "cd E:\\SurfGame; railway login"],
+      "port": 3003
+    },
+    {
+      "name": "railway-deploy",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "cd E:\\SurfGame; railway up --detach"],
+      "port": 3004
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm install\")",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}
