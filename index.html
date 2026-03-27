@@ -38,25 +38,13 @@
       bottom: 10px; right: 10px;
     }
 
-    /* ── Crosshair ─────────────────────────────────────────── */
+    /* ── Crosshair (managed by CrosshairSystem canvas) ──────── */
     #crosshair {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 16px; height: 16px;
-    }
-    #crosshair::before, #crosshair::after {
-      content: '';
-      position: absolute;
-      background: rgba(255,255,255,0.75);
-    }
-    #crosshair::before {
-      width: 1px; height: 16px;
-      left: 7px; top: 0;
-    }
-    #crosshair::after {
-      width: 16px; height: 1px;
-      top: 7px; left: 0;
+      pointer-events: none;
+      z-index: 300;
     }
 
     /* ── Hit marker (over crosshair) ───────────────────────── */
@@ -485,6 +473,46 @@
       transition: color 0.2s;
     }
     #settings-btn:hover { color: #00cfff; }
+
+    /* ── Mini session stat bar (bottom right, above weapon hud) ─ */
+    #mini-stats {
+      position: absolute;
+      bottom: 152px; right: 12px;
+      display: none;
+      gap: 12px;
+      pointer-events: none;
+      font-family: 'Consolas', monospace;
+    }
+    .mstat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+    }
+    .mstat-val {
+      font-size: 14px;
+      font-weight: bold;
+      color: #ccc;
+      text-shadow: 0 0 4px rgba(0,0,0,0.9);
+    }
+    .mstat-lbl {
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: #333;
+    }
+
+    /* ── Speed number pop (top-center) ──────────────────────── */
+    #speed-readout {
+      position: absolute;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      font-family: 'Consolas', monospace;
+      color: #225;
+      pointer-events: none;
+      letter-spacing: 2px;
+      transition: color 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -544,6 +572,56 @@
     <!-- Checkpoint splits -->
     <div id="split-display"></div>
 
+    <!-- XP / Level HUD (bottom-left corner, in-game) -->
+    <div id="xp-hud" style="
+      position:absolute; bottom:108px; left:16px;
+      pointer-events:none; display:none;
+    ">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+        <div id="xp-level-badge" style="
+          background:rgba(0,207,255,0.15); border:1px solid #00cfff44;
+          color:#00cfff; font-size:11px; font-weight:bold;
+          padding:2px 7px; border-radius:10px; font-family:monospace;
+        ">Lv 1</div>
+        <div id="xp-title" style="font-size:10px;color:#555;font-family:monospace;letter-spacing:1px">ROOKIE</div>
+      </div>
+      <div style="width:140px;height:5px;background:rgba(0,0,0,0.5);border-radius:3px;overflow:hidden;">
+        <div id="xp-bar-fill" style="
+          height:100%; width:0%;
+          background:linear-gradient(90deg,#0077aa,#00cfff);
+          border-radius:3px; transition:width 0.8s ease;
+        "></div>
+      </div>
+      <div id="xp-label" style="font-size:9px;color:#333;font-family:monospace;margin-top:2px">0 / 100 XP</div>
+    </div>
+
+    <!-- Mini session stat bar (bottom-right) -->
+    <div id="mini-stats" style="display:none;position:absolute;bottom:152px;right:12px;display:none;gap:12px;pointer-events:none;font-family:monospace">
+      <div class="mstat"><span id="ms-kd"  class="mstat-val">0.0</span><span class="mstat-lbl">K/D</span></div>
+      <div class="mstat"><span id="ms-maps" class="mstat-val">0</span>  <span class="mstat-lbl">MAPS</span></div>
+      <div class="mstat"><span id="ms-top"  class="mstat-val">0</span>  <span class="mstat-lbl">TOP</span></div>
+      <div class="mstat"><span id="ms-xp"   class="mstat-val">+0</span> <span class="mstat-lbl">XP</span></div>
+    </div>
+
+    <!-- Speed readout (top-center) -->
+    <div id="speed-readout"></div>
+
+    <!-- Level-up toast (center-top) -->
+    <div id="levelup-toast" style="
+      position:absolute; top:18%; left:50%; transform:translateX(-50%);
+      display:none; text-align:center; pointer-events:none; z-index:8000;
+    ">
+      <div style="
+        background:rgba(0,0,0,0.88); border:1px solid #00cfff;
+        padding:14px 32px; border-radius:8px;
+        box-shadow:0 0 30px #00cfff44;
+      ">
+        <div style="font-size:10px;letter-spacing:5px;color:#00cfff88;font-family:monospace">LEVEL UP</div>
+        <div id="levelup-num" style="font-size:32px;font-weight:900;color:#00cfff;font-family:monospace">1 → 2</div>
+        <div id="levelup-title" style="font-size:11px;color:#666;font-family:monospace;margin-top:2px">APPRENTICE</div>
+      </div>
+    </div>
+
     <!-- Connection lost overlay -->
     <div id="reconnect-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);
          align-items:center;justify-content:center;flex-direction:column;gap:10px;pointer-events:none;z-index:60">
@@ -600,6 +678,41 @@
       <div class="click-prompt">Click to start</div>
     </div>
   </div>
+
+  <!-- Loading splash (hidden after init) -->
+  <div id="loading-splash" style="
+    position:fixed; inset:0; z-index:99999;
+    background:#000; display:flex;
+    align-items:center; justify-content:center;
+    flex-direction:column; gap:20px;
+    font-family:'Consolas',monospace;
+    transition:opacity 0.6s ease;
+  ">
+    <div style="position:relative;text-align:center">
+      <div style="
+        font-size:72px; font-weight:900; color:#00cfff;
+        letter-spacing:20px;
+        text-shadow:0 0 60px rgba(0,207,255,0.6), 0 0 120px rgba(0,207,255,0.2);
+        animation:splashPulse 2s ease-in-out infinite;
+      ">SURF</div>
+      <div style="font-size:10px;letter-spacing:8px;color:#1a4a5a;margin-top:-4px">GAME</div>
+    </div>
+    <div id="loading-bar-wrap" style="width:220px;height:3px;background:#0a0a0a;border-radius:2px;overflow:hidden">
+      <div id="loading-bar" style="
+        height:100%; width:0%;
+        background:linear-gradient(90deg,#003850,#00cfff);
+        border-radius:2px; transition:width 0.3s ease;
+      "></div>
+    </div>
+    <div id="loading-text" style="font-size:10px;letter-spacing:3px;color:#1a3a4a">INITIALIZING</div>
+  </div>
+
+  <style>
+    @keyframes splashPulse {
+      0%,100% { opacity:0.85; text-shadow:0 0 40px rgba(0,207,255,0.4); }
+      50%      { opacity:1.0;  text-shadow:0 0 80px rgba(0,207,255,0.8), 0 0 140px rgba(0,207,255,0.3); }
+    }
+  </style>
 
   <script type="module" src="/src/client/main.js"></script>
 </body>

@@ -24,11 +24,15 @@ export class PauseMenu {
    * @param {SettingsManager} settings  — passed so sliders update live
    */
   constructor(input, settings = null) {
-    this._input    = input;
-    this._settings = settings;
-    this._el       = null;
-    this._visible  = false;
-    this._tab      = 'settings'; // 'settings' | 'mapselect'
+    this._input       = input;
+    this._settings    = settings;
+    this._el          = null;
+    this._visible     = false;
+    this._tab         = 'settings'; // 'settings' | 'mapselect' | 'stats' | 'crosshair'
+
+    // Set by main.js after construction
+    this._statTracker = null;
+    this._crosshair   = null;
 
     // Callbacks set by main.js
     this.onResume    = null;
@@ -187,9 +191,11 @@ export class PauseMenu {
           <div style="font-size:11px;letter-spacing:5px;color:#222;margin-bottom:4px">SURF</div>
           <div style="font-size:18px;font-weight:bold;color:#00cfff;margin-bottom:28px">PAUSED</div>
 
-          ${navBtn('pm-nav-resume',  '▶  Resume',     false)}
-          ${navBtn('pm-nav-settings','⚙  Settings',   this._tab === 'settings')}
-          ${navBtn('pm-nav-map',     '🗺  Change Map', this._tab === 'mapselect')}
+          ${navBtn('pm-nav-resume',    '▶  Resume',     false)}
+          ${navBtn('pm-nav-settings', '⚙  Settings',   this._tab === 'settings')}
+          ${navBtn('pm-nav-map',      '🗺  Change Map', this._tab === 'mapselect')}
+          ${navBtn('pm-nav-stats',    '📊  Stats',      this._tab === 'stats')}
+          ${navBtn('pm-nav-crosshair','✛  Crosshair',   this._tab === 'crosshair')}
 
           <div style="flex:1"></div>
 
@@ -201,13 +207,26 @@ export class PauseMenu {
         </div>
 
         <!-- Right content -->
-        <div style="flex:1;padding:24px 28px;overflow-y:auto;min-height:400px">
-          ${this._tab === 'settings' ? settingsHtml : mapHtml}
+        <div style="flex:1;padding:24px 28px;overflow-y:auto;min-height:400px" id="pm-content">
+          ${this._tab === 'settings'  ? settingsHtml
+          : this._tab === 'mapselect' ? mapHtml
+          : this._tab === 'stats'     ? '<div id="pm-stats-wrap"></div>'
+          :                             '<div id="pm-crosshair-wrap"></div>'}
         </div>
       </div>
     `;
 
     this._wireEvents();
+
+    // Inject dynamic tab content after DOM is ready
+    if (this._tab === 'stats' && this._statTracker) {
+      const wrap = document.getElementById('pm-stats-wrap');
+      if (wrap) wrap.innerHTML = this._statTracker.renderHTML();
+    }
+    if (this._tab === 'crosshair' && this._crosshair) {
+      const wrap = document.getElementById('pm-crosshair-wrap');
+      if (wrap) this._crosshair.openEditor(wrap);
+    }
   }
 
   _wireEvents() {
@@ -226,6 +245,16 @@ export class PauseMenu {
 
     $('pm-nav-map')?.addEventListener('click', () => {
       this._tab = 'mapselect';
+      this._render();
+    });
+
+    $('pm-nav-stats')?.addEventListener('click', () => {
+      this._tab = 'stats';
+      this._render();
+    });
+
+    $('pm-nav-crosshair')?.addEventListener('click', () => {
+      this._tab = 'crosshair';
       this._render();
     });
 

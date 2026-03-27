@@ -8,11 +8,13 @@ import { KNIFE_DEFS, KNIFE_BY_ID } from './KnifeSystem.js';
 
 export class MainMenu {
   constructor(onPlayMap, input = null, net = null) {
-    this._onPlayMap  = onPlayMap; // callback(mapId)
-    this._input      = input;     // InputManager — used to block pointer lock while menu is open
-    this._net        = net;       // NetworkClient — for lobby state
-    this.onJoinOnline = null;     // set by main.js
-    this._el         = null;
+    this._onPlayMap   = onPlayMap; // callback(mapId)
+    this._input       = input;     // InputManager — used to block pointer lock while menu is open
+    this._net         = net;       // NetworkClient — for lobby state
+    this.onJoinOnline  = null;     // set by main.js
+    this.onOpenLoadout = null;     // set by main.js → opens LoadoutMenu
+    this._xpSystem     = null;     // set by main.js after XPSystem loads
+    this._el          = null;
     this._visible    = false;
     this._tab        = 'play';   // 'play' | 'online' | 'loadout' | 'leaderboard' | 'settings'
     this._ownedKnives= new Set(['knife_default']);
@@ -67,7 +69,17 @@ export class MainMenu {
           <div style="font-size:36px;font-weight:bold;color:#00cfff;letter-spacing:4px">SURFGAME</div>
           <div style="color:#444;font-size:12px;margin-top:4px">
             Playing as <span style="color:${color}">${_esc(name)}</span>
+            ${this._xpSystem ? `&nbsp;&middot;&nbsp;<span style="color:#555">Lv ${this._xpSystem.level}</span>` : ''}
           </div>
+          ${this._xpSystem ? `
+            <div style="margin:8px auto 0;width:200px">
+              <div style="width:100%;height:4px;background:#111;border-radius:2px;overflow:hidden">
+                <div style="height:100%;width:${Math.min(100,(this._xpSystem.xp/this._xpSystem.xpNeeded)*100).toFixed(1)}%;
+                  background:linear-gradient(90deg,#0077aa,#00cfff);border-radius:2px;transition:width 0.6s"></div>
+              </div>
+              <div style="font-size:9px;color:#333;margin-top:2px">${this._xpSystem.xp} / ${this._xpSystem.xpNeeded} XP · ${this._xpSystem.title}</div>
+            </div>
+          ` : ''}
         </div>
 
         <!-- Tabs -->
@@ -201,37 +213,17 @@ export class MainMenu {
     `).join('');
   }
 
-  // ── Tab: Loadout ───────────────────────────────────────────────────────────
+  // ── Tab: Loadout (opens full LoadoutMenu) ─────────────────────────────────
 
   _renderLoadout() {
-    const knifeRows = KNIFE_DEFS.map(k => {
-      const owned    = this._ownedKnives.has(k.id);
-      const equipped = this._equippedKnife === k.id;
-      return `
-        <div onclick="${owned ? `window._menuEquipKnife('${k.id}')` : ''}" style="
-          display:flex;align-items:center;gap:10px;padding:8px 12px;
-          border:1px solid ${equipped?'#ffd700':owned?'#333':'#111'};
-          border-radius:6px;cursor:${owned?'pointer':'default'};
-          background:${equipped?'rgba(255,215,0,0.08)':'transparent'};
-          opacity:${owned?1:0.3};
-        ">
-          <div style="width:14px;height:14px;border-radius:50%;background:#${k.color.toString(16).padStart(6,'0')}"></div>
-          <div>
-            <div style="font-size:13px;color:${equipped?'#ffd700':'#ccc'}">${_esc(k.name)}</div>
-            <div style="font-size:10px;color:#555">${_esc(k.desc)}</div>
-          </div>
-          ${equipped ? '<span style="margin-left:auto;color:#ffd700;font-size:11px">EQUIPPED</span>' : ''}
-          ${!owned   ? '<span style="margin-left:auto;color:#333;font-size:11px">LOCKED</span>' : ''}
-        </div>
-      `;
-    }).join('');
-
+    // Open the dedicated LoadoutMenu immediately and close the main menu
+    setTimeout(() => {
+      if (this.onOpenLoadout) this.onOpenLoadout();
+    }, 50);
     return `
-      <div style="font-size:13px;color:#666;margin-bottom:12px">
-        ${this._ownedKnives.size}/${KNIFE_DEFS.length} knives unlocked
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;max-height:60vh;overflow-y:auto">
-        ${knifeRows}
+      <div style="text-align:center;padding:40px 0;color:#555">
+        <div style="font-size:32px;margin-bottom:12px">🔪</div>
+        <div style="font-size:14px;color:#444">Opening Loadout...</div>
       </div>
     `;
   }

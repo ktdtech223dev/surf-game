@@ -86,6 +86,22 @@ db.exec(`
     completed_at INTEGER NOT NULL DEFAULT (unixepoch()),
     PRIMARY KEY (player_id, challenge_id)
   );
+
+  CREATE TABLE IF NOT EXISTS player_xp (
+    player_id  INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+    xp         INTEGER NOT NULL DEFAULT 0,
+    level      INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE IF NOT EXISTS xp_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    amount     INTEGER NOT NULL,
+    source     TEXT    NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_xp_history_player ON xp_history(player_id, created_at);
 `);
 
 // ── Prepared statements ────────────────────────────────────────────────────────

@@ -4,27 +4,53 @@ Write-Host "=== Building ===" -ForegroundColor Cyan
 npm run build
 if ($LASTEXITCODE -ne 0) { Write-Host "BUILD FAILED" -ForegroundColor Red; exit 1 }
 
-Write-Host "=== Git commit ===" -ForegroundColor Cyan
+Write-Host "=== Git commit + push ===" -ForegroundColor Cyan
 git add -A
-git commit -m "Pause menu redesign + quick respawn + death hint"
-
-Write-Host "=== Git push (using gh token) ===" -ForegroundColor Cyan
+git commit -m "AAA polish: EffectsSystem, PlayerTrail, KillStreaks, CrosshairSystem, StatTracker, WeaponBob, sounds, loading splash, speed HUD"
 $ghToken = (gh auth token 2>&1)
-if ($ghToken -and $ghToken -notlike "*error*") {
-  $remote = "https://$ghToken@github.com/ktdtech223dev/surf-game.git"
-  git push $remote master
+if ($ghToken -and "$ghToken" -notmatch "error|not logged") {
+  git push "https://$($ghToken.Trim())@github.com/ktdtech223dev/surf-game.git" master
 } else {
-  Write-Host "gh token not found, trying push anyway..." -ForegroundColor Yellow
   git push origin master
 }
+Write-Host "Git push exit code: $LASTEXITCODE" -ForegroundColor $(if ($LASTEXITCODE -eq 0) { 'Green' } else { 'Red' })
 
-Write-Host "=== Triggering Railway deploy ===" -ForegroundColor Cyan
+Write-Host "=== Railway deploy ===" -ForegroundColor Cyan
 $cfg = Get-Content "C:\Users\kesha\.railway\config.json" | ConvertFrom-Json
-$token = $cfg.user.accessToken
-Write-Host "Using accessToken: $($token.Substring(0,8))..." -ForegroundColor Gray
-$body = '{"query":"mutation { serviceInstanceDeploy(serviceId: \"ee082310-0de8-4381-952e-7cf1e3063c8f\", environmentId: \"8d394e42-906e-4272-b5fc-8adba34f7f8c\") }"}'
+$refreshToken = $cfg.user.refreshToken
+
+$refreshResp = try {
+  Invoke-RestMethod -Method POST `
+    -Uri "https://backboard.railway.app/graphql/v2" `
+    -Headers @{ "Content-Type" = "application/json" } `
+    -Body (ConvertTo-Json @{ query = "mutation { authTokenRefresh(refreshToken: `"$refreshToken`") { accessToken expiresAt } }" })
+} catch { $null }
+
+$token = $null
+if ($refreshResp -and $refreshResp.data -and $refreshResp.data.authTokenRefresh) {
+  $token = $refreshResp.data.authTokenRefresh.accessToken
+}
+if ($token) {
+  Write-Host "Token refreshed!" -ForegroundColor Green
+  $cfg.user.accessToken = $token
+  $cfg | ConvertTo-Json -Depth 10 | Set-Content "C:\Users\kesha\.railway\config.json"
+} else {
+  $token = $cfg.user.accessToken
+  Write-Host "Using existing token" -ForegroundColor Yellow
+}
+
 $resp = Invoke-RestMethod -Method POST -Uri "https://backboard.railway.app/graphql/v2" `
   -Headers @{ "Authorization" = "Bearer $token"; "Content-Type" = "application/json" } `
-  -Body $body
-Write-Host "Railway response: $($resp | ConvertTo-Json)" -ForegroundColor Green
-Write-Host "=== All done! ===" -ForegroundColor Green
+  -Body '{"query":"mutation { serviceInstanceDeploy(serviceId: \"ee082310-0de8-4381-952e-7cf1e3063c8f\", environmentId: \"8d394e42-906e-4272-b5fc-8adba34f7f8c\") }"}'
+
+if ($resp.data) {
+  Write-Host "Railway deploy triggered!" -ForegroundColor Green
+} else {
+  Write-Host ($resp | ConvertTo-Json) -ForegroundColor Red
+  Write-Host ""
+  Write-Host "If Railway auth keeps failing, go to:" -ForegroundColor Yellow
+  Write-Host "https://railway.app/project/01c66726-0785-4b07-915c-3140e603ff2c" -ForegroundColor Cyan
+  Write-Host "and click Deploy manually." -ForegroundColor Yellow
+}
+
+Write-Host "=== Done ===" -ForegroundColor Green

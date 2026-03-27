@@ -151,6 +151,17 @@ class DataService {
     return this._retryWrite('POST', `/challenges/${challengeId}/complete`, {});
   }
 
+  // ── XP + Leveling ──────────────────────────────────────────────────────────
+
+  async getXP() {
+    return this._cached('xp', 30, () => this._req('GET', '/xp'));
+  }
+
+  async addXP(amount, source) {
+    this._invalidate('xp');
+    return this._req('POST', '/xp/add', { amount, source });
+  }
+
   // ── Internal helpers ───────────────────────────────────────────────────────
 
   async _req(method, path, body = null, auth = true) {

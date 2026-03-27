@@ -22,6 +22,7 @@ import achievementsRoutes from './routes/achievements.js';
 import unlocksRoutes     from './routes/unlocks.js';
 import challengesRoutes  from './routes/challenges.js';
 import settingsRoutes    from './routes/settings.js';
+import xpRoutes          from './routes/xp.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT      = process.env.PORT || 3000;
@@ -51,6 +52,7 @@ app.use('/api', achievementsRoutes);
 app.use('/api', unlocksRoutes);
 app.use('/api', challengesRoutes);
 app.use('/api', settingsRoutes);
+app.use('/api', xpRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ ok: true }));

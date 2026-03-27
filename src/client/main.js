@@ -23,12 +23,21 @@ import { AchievementSystem } from './AchievementSystem.js';
 import { KnifeSystem }       from './KnifeSystem.js';
 import { ChallengeSystem }   from './ChallengeSystem.js';
 import { PauseMenu }         from './PauseMenu.js';
+import { XPSystem, DIFFICULTY_MULT } from './XPSystem.js';
+import { RewardScreen }     from './RewardScreen.js';
+import { LoadoutMenu }      from './LoadoutMenu.js';
 import { MAP_CATALOG, MAP_BY_ID, MAPS_BY_DIFF } from './MapCatalog.js';
 import { buildTestMap, getSpawnPosition, MAP as MAP01 } from './MapBuilder.js';
 import { createPlayerState, simulateTick } from '../shared/physics/MovementEngine.js';
 import { TICK_RATE, TICK_INTERVAL }         from '../shared/physics/constants.js';
 import * as Vec3 from '../shared/physics/vec3.js';
 import { generateProceduralEntry } from './ProceduralMapGen.js';
+import { EffectsSystem }    from './EffectsSystem.js';
+import { PlayerTrail }      from './PlayerTrail.js';
+import { KillStreakSystem }  from './KillStreakSystem.js';
+import { CrosshairSystem }  from './CrosshairSystem.js';
+import { StatTracker }      from './StatTracker.js';
+import { WeaponBob }        from './WeaponBob.js';
 
 // ── Clear map geometry from scene (preserves permanent objects) ────────────────
 function _clearMap(scene) {
@@ -63,10 +72,26 @@ const sound      = new SoundManager();
 const settings   = new SettingsManager();
 
 // New systems
-const ghostSys   = new GhostSystem(renderer.scene);
-const achieve    = new AchievementSystem();
-const knifeInst  = new KnifeSystem(renderer.scene, renderer.camera);
-const challenge  = new ChallengeSystem();
+const ghostSys    = new GhostSystem(renderer.scene);
+const achieve     = new AchievementSystem();
+const knifeInst   = new KnifeSystem(renderer.scene, renderer.camera);
+const challenge   = new ChallengeSystem();
+const xpSys       = new XPSystem();
+const rewardScr   = new RewardScreen();
+const loadoutMenu = new LoadoutMenu(knifeInst, xpSys);
+
+// ── AAA Polish systems ──────────────────────────────────────────────────────────
+const effects   = new EffectsSystem(renderer.camera, renderer.scene);
+const trail     = new PlayerTrail(renderer.scene);
+const streakSys = new KillStreakSystem(
+  null,
+  (amount, src) => { xpSys.add(amount, src).then(() => _updateXPHud()).catch(() => {}); },
+  sound
+);
+const crosshair = new CrosshairSystem();
+const statTrack = new StatTracker();
+const _shakeOffset = { x: 0, y: 0 };
+const weaponBob    = new WeaponBob();
 
 // Physics + map state
 const playerState = createPlayerState();
@@ -167,7 +192,9 @@ function _updateSplits(pos, elapsed) {
     const key = `cp${i+1}`;
     if (!splits[key] && pos.z > bounds[i].endZ && pos.y < bounds[i].endY + 30) {
       splits[key] = elapsed;
-      sound.playChat();
+      sound.playCheckpoint();
+      effects.checkpointRing(playerState.position);
+      statTrack.onCheckpoint();
     }
   }
   _renderSplits(elapsed);
@@ -213,6 +240,9 @@ async function _showFinish(timeSec) {
   const isPB = bestRunSec == null || timeSec < bestRunSec;
   if (isPB) bestRunSec = timeSec;
 
+  statTrack.onMapFinish(timeSec);
+  if (isPB) streakSys.onPersonalBest(timeSec, activeMapId);
+
   if (finishTimeEl) finishTimeEl.textContent = _fmtTime(timeSec);
   if (finishPbEl)   finishPbEl.textContent   = isPB ? '★ NEW PERSONAL BEST' : `Best: ${_fmtTime(bestRunSec)}`;
   if (finishBanner) finishBanner.style.display = 'block';
@@ -222,6 +252,36 @@ async function _showFinish(timeSec) {
   // Network + server
   net.sendFinish(timeSec, activeMapId);
 
+  // ── XP awards ──────────────────────────────────────────────────────────────
+  const oldLevel = xpSys.level;
+  const oldXP    = xpSys.xp;
+  const xpGains  = [];
+
+  // Get map difficulty
+  const mapDef   = MAP_BY_ID?.[activeMapId];
+  const diffKey  = mapDef?.difficulty ?? 'beginner';
+  const diffMult = DIFFICULTY_MULT[diffKey] ?? 1.0;
+  const baseXP   = Math.round(50 * diffMult);
+
+  xpGains.push({ amount: baseXP, source: 'map_finish', label: 'Map Finish' });
+  await xpSys.add(baseXP, 'map_finish');
+
+  if (isPB) {
+    xpGains.push({ amount: 25, source: 'beat_pb', label: 'Personal Best' });
+    await xpSys.add(25, 'beat_pb');
+  }
+
+  // Time bonus (if under par time of 90s * difficulty)
+  const par = 90 / diffMult;
+  if (timeSec < par) {
+    const ratio  = Math.max(0, 1 - timeSec / par);
+    const bonus  = Math.min(50, Math.round(50 * ratio * diffMult));
+    if (bonus > 0) {
+      xpGains.push({ amount: bonus, source: 'time_bonus', label: 'Time Bonus' });
+      await xpSys.add(bonus, 'time_bonus');
+    }
+  }
+
   if (ds.isReady) {
     // Submit score
     ds.submitScore(activeMapId, Math.round(timeSec * 1000)).catch(() => {});
@@ -229,7 +289,7 @@ async function _showFinish(timeSec) {
     // Upload ghost
     if (isPB) ghostSys.upload(activeMapId, timeSec).catch(() => {});
 
-    // Grant knife
+    // Grant knife skin
     const knifeId = activeMap.knifeId;
     if (knifeId) {
       const granted = await knifeInst.grant(knifeId);
@@ -243,12 +303,114 @@ async function _showFinish(timeSec) {
     // Achievement + challenge
     achieve.onMapFinish(activeMapId, timeSec);
     const chResults = await challenge.checkMapFinish(activeMapId, timeSec);
-    if (chResults.daily)  achieve.onDailyComplete();
-    if (chResults.weekly) achieve.onWeeklyComplete();
+    if (chResults.daily) {
+      achieve.onDailyComplete();
+      xpGains.push({ amount: 100, source: 'daily_challenge', label: 'Daily Challenge' });
+      await xpSys.awardDailyChallenge();
+    }
+    if (chResults.weekly) {
+      achieve.onWeeklyComplete();
+      xpGains.push({ amount: 500, source: 'weekly_challenge', label: 'Weekly Challenge' });
+      await xpSys.awardWeeklyChallenge();
+    }
   }
 
+  // Show reward screen after 1.5s (let finish banner show first)
+  const totalXP  = xpGains.reduce((s, g) => s + g.amount, 0);
+  const unlocks  = [];  // level-up unlocks come via xpSys.onLevelUp callback
+  setTimeout(() => {
+    rewardScr.show({
+      xpGains, xpSystem: xpSys, oldLevel, oldXP,
+      unlocks: _pendingUnlocks.splice(0),
+    });
+    _pendingUnlocks.length = 0;
+  }, 1600);
+
+  _updateXPHud();
   setTimeout(() => { if (finishBanner) finishBanner.style.display = 'none'; }, 6000);
 }
+
+// Pending unlocks collected by xpSys.onLevelUp before reward screen shows
+const _pendingUnlocks = [];
+
+// ── XP HUD ─────────────────────────────────────────────────────────────────────
+const xpHudEl     = document.getElementById('xp-hud');
+const xpFillEl    = document.getElementById('xp-bar-fill');
+const xpLabelEl   = document.getElementById('xp-label');
+const xpLevelBadge = document.getElementById('xp-level-badge');
+const xpTitleEl   = document.getElementById('xp-title');
+
+// ── Mini stat bar ──────────────────────────────────────────────────────────────
+const miniStatsEl = document.getElementById('mini-stats');
+const msKdEl      = document.getElementById('ms-kd');
+const msMapsEl    = document.getElementById('ms-maps');
+const msTopEl     = document.getElementById('ms-top');
+const msXpEl      = document.getElementById('ms-xp');
+const speedReadEl = document.getElementById('speed-readout');
+
+function _updateMiniStats() {
+  if (!miniStatsEl) return;
+  miniStatsEl.style.display = 'flex';
+  const m = statTrack.renderMiniHUD();
+  if (msKdEl   && m[0]) msKdEl.textContent   = m[0].value;
+  if (msMapsEl && m[1]) msMapsEl.textContent  = m[1].value;
+  if (msTopEl  && m[2]) msTopEl.textContent   = m[2].value;
+  if (msXpEl   && m[3]) msXpEl.textContent    = m[3].value;
+}
+
+let _lastSpeedUpdate = 0;
+function _updateSpeedReadout(hSpeed) {
+  if (!speedReadEl) return;
+  const now = performance.now();
+  if (now - _lastSpeedUpdate < 66) return; // ~15 fps throttle
+  _lastSpeedUpdate = now;
+  if (hSpeed < 50) { speedReadEl.textContent = ''; return; }
+  speedReadEl.textContent = `${hSpeed | 0} u/s`;
+  const t = Math.min(1, (hSpeed - 200) / 1200);
+  const r = Math.round(0   + t * 255);
+  const g = Math.round(207 - t * 150);
+  const b = Math.round(255 - t * 200);
+  speedReadEl.style.color = `rgb(${r},${g},${b})`;
+}
+
+function _updateXPHud() {
+  if (!xpHudEl) return;
+  xpHudEl.style.display = 'block';
+  const pct = Math.min(100, (xpSys.xp / xpSys.xpNeeded) * 100).toFixed(1);
+  if (xpFillEl)     xpFillEl.style.width     = `${pct}%`;
+  if (xpLabelEl)    xpLabelEl.textContent     = `${xpSys.xp} / ${xpSys.xpNeeded} XP`;
+  if (xpLevelBadge) xpLevelBadge.textContent  = `Lv ${xpSys.level}`;
+  if (xpTitleEl)    xpTitleEl.textContent      = xpSys.title.toUpperCase();
+  _updateMiniStats();
+}
+
+function _showLevelUp(oldLevel, newLevel, unlocks) {
+  const toastEl  = document.getElementById('levelup-toast');
+  const numEl    = document.getElementById('levelup-num');
+  const titleEl  = document.getElementById('levelup-title');
+  if (!toastEl) return;
+  if (numEl)   numEl.textContent  = `${oldLevel} → ${newLevel}`;
+  if (titleEl) titleEl.textContent = xpSys.title.toUpperCase();
+  toastEl.style.display = 'block';
+  toastEl.style.animation = 'none';
+  void toastEl.offsetWidth; // reflow
+  toastEl.style.animation = 'slideInRight 0.4s ease, fadeOut 0.5s 2.8s forwards';
+  setTimeout(() => { toastEl.style.display = 'none'; }, 3400);
+  // Queue unlocks for reward screen
+  if (unlocks?.length) _pendingUnlocks.push(...unlocks);
+  // Grant knife types from level rewards
+  for (const u of (unlocks ?? [])) {
+    if (u.type === 'knife_type') knifeInst.grantType(u.id);
+  }
+  sound.playLevelUp();
+}
+
+// Hook XP system events
+xpSys.onLevelUp = (oldLevel, newLevel, unlocks) => {
+  _showLevelUp(oldLevel, newLevel, unlocks);
+  _updateXPHud();
+};
+xpSys.onXPGain = (amount) => { _updateXPHud(); statTrack.onXPEarned(amount ?? 0); };
 
 // ── Map loading ────────────────────────────────────────────────────────────────
 async function _loadMap(mapId) {
@@ -375,7 +537,13 @@ const mainMenu = new MainMenu(async (mapId) => {
   // Re-lock pointer after menu closes
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 }, input, net);
-mainMenu.onJoinOnline = _joinOnline;
+mainMenu.onJoinOnline    = _joinOnline;
+mainMenu._xpSystem       = xpSys;
+mainMenu.onOpenLoadout   = () => {
+  mainMenu.hide();
+  loadoutMenu.show();
+  loadoutMenu.onClose = () => mainMenu.show();
+};
 
 // ── Pause menu ────────────────────────────────────────────────────────────────
 const pauseMenu = new PauseMenu(input, settings);
@@ -386,6 +554,8 @@ pauseMenu.onChangeMap = async (mapId) => {
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 };
 pauseMenu.onMainMenu  = () => { mainMenu.show(); };
+pauseMenu._statTracker = statTrack;
+pauseMenu._crosshair   = crosshair;
 
 // ── Network callbacks ──────────────────────────────────────────────────────────
 net.onWelcome = (id, name) => {
@@ -396,7 +566,12 @@ net.onWelcome = (id, name) => {
 net.onPeerUpdate  = (id, snap, t) => { ghosts.addSnapshot(id, snap, t ?? Date.now()); scoreboard.upsert(id, { id, name: snap.name, hp: snap.hp }); };
 net.onPeerLeave   = (id) => { ghosts.remove(id); scoreboard.remove(id); };
 net.onDmg         = (targetId, _, hp) => { ghosts.setHp(targetId, hp); ghosts.flashHit(targetId); scoreboard.upsert(targetId, { hp }); };
-net.onHurt        = (_dmg, hp) => { _setHp(hp); sound.playHurt(); if (hp <= 0) _showDeath(); else _flashDamage(); };
+net.onHurt        = (_dmg, hp) => {
+  _setHp(hp); sound.playHurt();
+  effects.hitFlash(hp <= 30 ? 1.2 : 0.7);
+  if (hp <= 0) { _showDeath(); streakSys.onDeath(); statTrack.onDeath(); }
+  else _flashDamage();
+};
 net.onKill        = (kill) => {
   killFeed.addKill(kill, net.id);
   if (kill.killerId === net.id) {
@@ -404,6 +579,10 @@ net.onKill        = (kill) => {
     sessionKills++;
     achieve.onKill();
     challenge.checkKills(sessionKills).catch(() => {});
+    xpSys.awardKill().then(() => _updateXPHud()).catch(() => {});
+    streakSys.onKill();
+    statTrack.onKill();
+    effects.killFlash();
   }
   if (kill.victimId !== net.id) { ghosts.setHp(kill.victimId, 0); scoreboard.upsert(kill.victimId, { hp: 0, alive: false }); }
   scoreboard.upsert(kill.killerId, { kills: (scoreboard._players.get(kill.killerId)?.kills ?? 0) + 1 });
@@ -416,7 +595,7 @@ net.onRespawn = (hp) => {
   playerState.position.z = spawn.z;
   Vec3.set(playerState.velocity, 0, 0, 0);
 };
-net.onHitConfirm  = () => { weapon.onHitConfirm(); sound.playHit(); };
+net.onHitConfirm  = () => { weapon.onHitConfirm(); sound.playHit(); statTrack.onHit(); };
 net.onPlayerList  = (list) => { scoreboard.setLocalId(net.id); scoreboard.updateFromList(list); };
 net.onChat        = (_, name, text) => { _addChatLine(name, text); sound.playChat(); };
 net.onMetaUpdate  = (id, name, color) => { ghosts.setName(id, name); if (color) ghosts.setColor?.(id, color); scoreboard.upsert(id, { name }); };
@@ -529,22 +708,47 @@ function _handleFootsteps(state) {
   const now = performance.now();
   const onGround = state.onGround;
   const hSpeed   = Vec3.lengthXZ(state.velocity);
-  if (onGround && _wasInAir && hSpeed > 100) { sound.playLand(); _lastStepTime = now; }
+  if (onGround && _wasInAir && hSpeed > 100) { sound.playLand(); effects.landStomp(hSpeed); _lastStepTime = now; }
   _wasInAir = !onGround && !state.onRamp;
   if (onGround && hSpeed > 30 && now - _lastStepTime > 380) { sound.playFootstep(); _lastStepTime = now; }
 }
 
 // ── Speed achievement check (throttled) ───────────────────────────────────────
 let _lastAchieveSpeed = 0;
+let _burstThresholds = [600, 900, 1200, 1600];
+let _burstFired = new Set();
 function _checkSpeedAchieves(hSpeed) {
   if (Math.abs(hSpeed - _lastAchieveSpeed) < 20) return;
   _lastAchieveSpeed = hSpeed;
   achieve.onSpeed(hSpeed);
   challenge.checkSpeed(hSpeed).catch(() => {});
+  // Speed burst sound thresholds
+  for (const t of _burstThresholds) {
+    if (hSpeed >= t && !_burstFired.has(t)) {
+      _burstFired.add(t);
+      sound.playSpeedBurst();
+      setTimeout(() => _burstFired.delete(t), 8000);
+    }
+  }
 }
 
 // ── Game init ─────────────────────────────────────────────────────────────────
+// ── Loading splash helpers ─────────────────────────────────────────────────────
+const _splashEl  = document.getElementById('loading-splash');
+const _splashBar = document.getElementById('loading-bar');
+const _splashTxt = document.getElementById('loading-text');
+function _splashProgress(pct, text) {
+  if (_splashBar) _splashBar.style.width = `${pct}%`;
+  if (_splashTxt) _splashTxt.textContent = text;
+}
+function _hideSplash() {
+  if (!_splashEl) return;
+  _splashEl.style.opacity = '0';
+  setTimeout(() => { _splashEl.style.display = 'none'; }, 650);
+}
+
 async function initGame() {
+  _splashProgress(10, 'CONNECTING');
   // Register / login via DataService
   let playerName = settings.name ?? 'Player';
   if (settings.isFirstLaunch) await settings.promptName();
@@ -553,6 +757,7 @@ async function initGame() {
   // Register with server
   try {
     await ds.register(playerName);
+    _splashProgress(30, 'LOADING PROFILE');
     // Load server settings
     const serverSettings = await ds.getSettings().catch(() => null);
     if (serverSettings) {
@@ -560,21 +765,29 @@ async function initGame() {
       if (serverSettings.fov)         { renderer.setFOV?.(serverSettings.fov); }
       if (serverSettings.volume)      { sound.setVolume(serverSettings.volume); }
     }
+    _splashProgress(55, 'LOADING GAME DATA');
     // Load all game data in parallel
     await Promise.all([
       achieve.load(),
       knifeInst.load(),
       challenge.load(),
+      xpSys.load(),
     ]);
+    _updateXPHud();
   } catch (e) {
     console.warn('[DataService] Server unavailable, running offline:', e.message);
   }
 
+  _splashProgress(80, 'BUILDING MAP');
   // Load default map
   await _loadMap('map_01');
 
+  _splashProgress(100, 'READY');
+  await new Promise(r => setTimeout(r, 350)); // brief "READY" moment
+
   // Show main menu
   await mainMenu.show();
+  _hideSplash();
 
   _createOnlineHud();
   requestAnimationFrame(gameLoop);
@@ -612,7 +825,12 @@ function gameLoop(now) {
     _handleFootsteps(playerState);
 
     const canShoot = input.locked && !input.chatOpen && localAlive && !settings.isPanelOpen();
-    if (canShoot && inp.shoot)         weapon.tryFire(null, playerState.position, inp.yaw, inp.pitch);
+    if (canShoot && inp.shoot) {
+      weapon.tryFire(null, playerState.position, inp.yaw, inp.pitch);
+      crosshair.onShoot();
+      statTrack.onShot();
+      effects.muzzleFlash(playerState.position);
+    }
     if (canShoot && input.isFireHeld()) weapon.tryFire(null, playerState.position, inp.yaw, inp.pitch);
 
     // Ghost recording
@@ -664,6 +882,27 @@ function gameLoop(now) {
   renderer.setVignetteIntensity(Math.max(0, Math.min(1, (hSpeed - 400) / 800)));
   renderer.render();
 
+  // ── Polish system ticks ─────────────────────────────────────────────────────
+  _shakeOffset.x = 0; _shakeOffset.y = 0;
+  effects.setSpeed(hSpeed);
+  effects.tick(dt, _shakeOffset);
+
+  // Weapon bob + screen shake combined offset
+  weaponBob.tick(dt, hSpeed, playerState.onGround || playerState.onRamp, 0, 0);
+  renderer.camera.position.x += _shakeOffset.x + weaponBob.offset.x;
+  renderer.camera.position.y += _shakeOffset.y + weaponBob.offset.y;
+  renderer.camera.rotation.x += weaponBob.offset.rx;
+  renderer.camera.rotation.y += weaponBob.offset.ry;
+  renderer.camera.rotation.z += weaponBob.offset.rz;
+
+  trail.tick(dt, playerState.position, hSpeed, playerState.onRamp);
+  crosshair.tick(dt);
+  crosshair.setSpeed(hSpeed);
+  statTrack.tickSpeed(hSpeed, dt);
+  statTrack.tickTimePlayed(dt);
+  if (tickCount % 120 === 0) streakSys.onSpeedMilestone(hSpeed);
+  if (tickCount % 12  === 0) { _updateMiniStats(); _updateSpeedReadout(hSpeed); }
+
   debug.update(playerState, inp2, {
     playerCount: net.playerCount,
     connected:   net.connected,
@@ -677,7 +916,7 @@ function gameLoop(now) {
 }
 
 // ── Expose debug handle ────────────────────────────────────────────────────────
-window.__surf = { playerState, input, collisionWorld, net, weapon, sound, settings, ds };
+window.__surf = { playerState, input, collisionWorld, net, weapon, sound, settings, ds, xpSys, knifeInst, loadoutMenu, effects, trail, streakSys, crosshair, statTrack };
 
 function _esc(str)   { return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function _fmtTime(t) {

@@ -314,4 +314,83 @@ export class SoundManager {
     osc.start(now);
     osc.stop(now + 0.12);
   }
+
+  playLevelUp() {
+    // Triumphant 5-tone ascending arpeggio
+    if (!this._ready) return;
+    const ctx = this._ctx;
+    const now = ctx.currentTime;
+    const notes = [523, 659, 784, 1047, 1319]; // C5 E5 G5 C6 E6
+    notes.forEach((f, i) => {
+      const t   = now + i * 0.11;
+      const osc = ctx.createOscillator();
+      osc.type            = 'sine';
+      osc.frequency.value = f;
+
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.38, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+
+      osc.connect(g);
+      g.connect(this._master);
+      osc.start(t);
+      osc.stop(t + 0.55);
+
+      // Add harmonic shimmer
+      const osc2 = ctx.createOscillator();
+      osc2.type            = 'triangle';
+      osc2.frequency.value = f * 2;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0, t);
+      g2.gain.linearRampToValueAtTime(0.12, t + 0.015);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc2.connect(g2);
+      g2.connect(this._master);
+      osc2.start(t);
+      osc2.stop(t + 0.3);
+    });
+  }
+
+  playCheckpoint() {
+    // Quick ascending two-note chime
+    if (!this._ready) return;
+    const ctx  = this._ctx;
+    const now  = ctx.currentTime;
+    const freqs = [880, 1320];
+    freqs.forEach((f, i) => {
+      const t   = now + i * 0.09;
+      const osc = ctx.createOscillator();
+      osc.type            = 'sine';
+      osc.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.3, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.connect(g); g.connect(this._master);
+      osc.start(t); osc.stop(t + 0.25);
+    });
+  }
+
+  playSpeedBurst() {
+    // Rising whoosh when hitting high speed
+    if (!this._ready) return;
+    const ctx  = this._ctx;
+    const now  = ctx.currentTime;
+    const dur  = 0.3;
+    const buf  = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(600, now);
+    filter.frequency.linearRampToValueAtTime(2400, now + dur);
+    filter.Q.value = 1.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.18, now);
+    g.gain.linearRampToValueAtTime(0.0, now + dur);
+    src.connect(filter); filter.connect(g); g.connect(this._master);
+    src.start(now);
+  }
 }
