@@ -11,7 +11,8 @@
       "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm run build\")",
       "Bash(powershell -Command \"Set-Location E:\\\\SurfGame; npm run build\")",
       "Bash(start powershell:*)",
-      "Bash(powershell.exe -NonInteractive -File \"E:\\\\SurfGame\\\\deploy.ps1\")"
+      "Bash(powershell.exe -NonInteractive -File \"E:\\\\SurfGame\\\\deploy.ps1\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"E:\\\\SurfGame\\\\deploy.ps1\")"
     ]
   }
 }

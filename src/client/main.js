@@ -100,7 +100,8 @@ let activeMap = MAP01;   // MAP descriptor (FINISH_Z, FINISH_Y, etc.)
 let activeMapId = 'map_01';
 
 // ── Mode ───────────────────────────────────────────────────────────────────────
-let _mode = 'solo'; // 'solo' | 'online'
+let _mode   = 'solo'; // 'solo' | 'online'
+let _inGame = false;  // true only after player has chosen a map and entered play
 
 // ── Online lobby state ─────────────────────────────────────────────────────────
 let _lobbyState = null;
@@ -133,9 +134,9 @@ document.getElementById('settings-btn')?.addEventListener('click', () => {
 // listen for the native pointerlockchange event.
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement) return; // lock acquired – nothing to do
-  // Lock was released.  Only show the pause menu when actually in-game.
-  const inGame = collisionWorld && !mainMenu.visible && !loadoutMenu.visible;
-  if (inGame && !pauseMenu.visible) {
+  // Only open pause when the player has deliberately entered the game.
+  // _inGame is false during main menu, loadout, and any other pre-game state.
+  if (_inGame && !mainMenu.visible && !loadoutMenu.visible && !pauseMenu.visible) {
     pauseMenu.show();
   }
 });
@@ -538,6 +539,7 @@ async function _joinOnline() {
   const mapId = _lobbyState?.mapId ?? 'map_01';
   await _loadMap(mapId);
   mainMenu.hide();
+  _inGame = true;
   _updateOnlineHud();
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 }
@@ -546,15 +548,20 @@ async function _joinOnline() {
 const mainMenu = new MainMenu(async (mapId) => {
   _mode = 'solo';
   await _loadMap(mapId);
-  // Re-lock pointer after menu closes
+  _inGame = true;
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 }, input, net);
 mainMenu.onJoinOnline    = _joinOnline;
 mainMenu._xpSystem       = xpSys;
 mainMenu.onOpenLoadout   = () => {
   mainMenu.hide();
+  // Keep menuOpen = true so pointer lock cannot be (re)acquired inside loadout
+  input.menuOpen = true;
   loadoutMenu.show();
-  loadoutMenu.onClose = () => mainMenu.show();
+  loadoutMenu.onClose = () => {
+    input.menuOpen = false; // restore — mainMenu.show() will set it again immediately
+    mainMenu.show();
+  };
 };
 
 // ── Pause menu ────────────────────────────────────────────────────────────────
@@ -563,9 +570,13 @@ pauseMenu.onResume    = () => { renderer.renderer.domElement.requestPointerLock?
 pauseMenu.onChangeMap = async (mapId) => {
   _mode = 'solo';
   await _loadMap(mapId);
+  _inGame = true;
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 };
-pauseMenu.onMainMenu  = () => { mainMenu.show(); };
+pauseMenu.onMainMenu  = () => {
+  _inGame = false;
+  mainMenu.show();
+};
 pauseMenu._statTracker = statTrack;
 pauseMenu._crosshair   = crosshair;
 
@@ -790,14 +801,10 @@ async function initGame() {
     console.warn('[DataService] Server unavailable, running offline:', e.message);
   }
 
-  _splashProgress(80, 'BUILDING MAP');
-  // Load default map
-  await _loadMap('map_01');
-
   _splashProgress(100, 'READY');
-  await new Promise(r => setTimeout(r, 350)); // brief "READY" moment
+  await new Promise(r => setTimeout(r, 300));
 
-  // Show main menu
+  // Show main menu — no map is loaded yet; player spawns only after picking one
   await mainMenu.show();
   _hideSplash();
 
