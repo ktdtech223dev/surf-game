@@ -30,12 +30,16 @@ export class NetworkClient {
     this.onFinish      = null; // ({ id, name, time }) → void
     this.onLeaderboard = null; // (list) → void
 
-    this._pingInterval = null;
-    this._pingSentAt   = 0;
+    this._pingInterval    = null;
+    this._pingSentAt      = 0;
+    this._reconnectTimer  = null;
+    this._reconnectDelay  = 2000; // ms
+    this._proto           = null;
   }
 
   connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this._proto = proto;
     try {
       this.ws = new WebSocket(`${proto}//${location.host}`);
     } catch {
@@ -58,6 +62,9 @@ export class NetworkClient {
     this.ws.onclose = () => {
       this.connected = false;
       clearInterval(this._pingInterval);
+      this._showReconnecting(true);
+      // Auto-reconnect after delay
+      this._reconnectTimer = setTimeout(() => this._reconnect(), this._reconnectDelay);
     };
 
     this.ws.onerror = () => {};
@@ -201,5 +208,35 @@ export class NetworkClient {
   _send(obj) {
     if (!this.connected || this.ws?.readyState !== WebSocket.OPEN) return;
     this.ws.send(JSON.stringify(obj));
+  }
+
+  _reconnect() {
+    clearTimeout(this._reconnectTimer);
+    if (this.connected) return;
+    try {
+      this.ws = new WebSocket(`${this._proto}//${location.host}`);
+      this.ws.onopen = () => {
+        this.connected = true;
+        this._showReconnecting(false);
+        this._pingInterval = setInterval(() => this._sendPing(), 2000);
+        if (this.onConnect) this.onConnect();
+      };
+      this.ws.onmessage = (e) => {
+        let msg; try { msg = JSON.parse(e.data); } catch { return; }
+        this._handle(msg);
+      };
+      this.ws.onclose = () => {
+        this.connected = false;
+        clearInterval(this._pingInterval);
+        this._showReconnecting(true);
+        this._reconnectTimer = setTimeout(() => this._reconnect(), this._reconnectDelay);
+      };
+      this.ws.onerror = () => {};
+    } catch { /* no server */ }
+  }
+
+  _showReconnecting(show) {
+    const el = document.getElementById('reconnect-overlay');
+    if (el) el.style.display = show ? 'flex' : 'none';
   }
 }

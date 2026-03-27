@@ -51,6 +51,17 @@ export class DebugOverlay {
       stateLabel = 'AIR'; stateColor = '#ff8800';
     }
 
+    // Section indicator
+    const z = state.position.z;
+    let section = '';
+    if      (z < 350)   section = '<span style="color:#445;font-size:10px"> SPAWN</span>';
+    else if (z < 2150)  section = '<span style="color:#3366cc;font-size:10px"> S1</span>';
+    else if (z < 2550)  section = '<span style="color:#445;font-size:10px"> PAD1</span>';
+    else if (z < 3750)  section = '<span style="color:#00cc88;font-size:10px"> S2</span>';
+    else if (z < 4150)  section = '<span style="color:#445;font-size:10px"> PAD2</span>';
+    else if (z < 5650)  section = '<span style="color:#aa44ff;font-size:10px"> S3</span>';
+    else                section = '<span style="color:#ffcc00;font-size:10px"> FINISH</span>';
+
     // Speed gain rate (last 32 ticks ≈ 0.25 s)
     const hist = state.speedHistory;
     let gainStr = '';
@@ -101,7 +112,7 @@ export class DebugOverlay {
     this.hudEl.innerHTML = `
       <div style="font-size:10px;color:#444">FPS: ${this.fps}</div>
       <div style="margin-top:4px">
-        <span style="color:${stateColor};font-weight:bold">${stateLabel}</span>${gainStr}
+        <span style="color:${stateColor};font-weight:bold">${stateLabel}</span>${section}${gainStr}
       </div>
       <div style="margin-top:5px;font-size:24px;font-weight:bold;color:${speedColor}">
         ${hSpeed.toFixed(0)}<span style="font-size:12px;color:#666"> u/s</span>

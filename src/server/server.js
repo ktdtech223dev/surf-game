@@ -31,7 +31,8 @@ const MIN_FINISH_TIME = 15;  // seconds — minimum valid run time
 const MAX_LEADERBOARD = 10;  // top N times to keep
 
 // ── Player state ──────────────────────────────────────────────────────────────
-const players = new Map(); // id → { ws, snap, hp, name, kills, deaths, pingMs, alive, color }
+const players = new Map(); // id → { ws, snap, hp, name, kills, deaths, pingMs, alive, color, lastShot }
+const SHOOT_INTERVAL_MS = 150; // min ms between server-accepted shots
 let nextId = 1;
 
 // ── Run leaderboard (top 10 best times, persists in memory) ───────────────────
@@ -118,10 +119,14 @@ wss.on('connection', (ws) => {
     switch (msg.type) {
 
       case 'snap': {
+        const x = +msg.x, y = +msg.y, z = +msg.z;
+        // Basic bounds sanity — reject obviously invalid positions
+        if (!isFinite(x) || !isFinite(y) || !isFinite(z)) break;
+        if (Math.abs(x) > 5000 || y < -2500 || y > 500 || z < -500 || z > 8000) break;
         const snap = {
-          x: msg.x, y: msg.y, z: msg.z,
-          vx: msg.vx, vy: msg.vy, vz: msg.vz,
-          yaw: msg.yaw, onRamp: msg.onRamp,
+          x, y, z,
+          vx: +msg.vx || 0, vy: +msg.vy || 0, vz: +msg.vz || 0,
+          yaw: +msg.yaw || 0, onRamp: msg.onRamp ? 1 : 0,
         };
         player.snap = snap;
         broadcast(id, { type: 'snap', id, t: Date.now(), ...snap });
@@ -130,6 +135,9 @@ wss.on('connection', (ws) => {
 
       case 'shoot': {
         if (!player.alive) break;
+        const now = Date.now();
+        if (now - (player.lastShot || 0) < SHOOT_INTERVAL_MS) break;
+        player.lastShot = now;
 
         const { ox, oy, oz, dx, dy, dz } = msg;
 

@@ -13,9 +13,10 @@ const RELOAD_TIME   = 1500; // ms
 const HIT_MARKER_MS = 250;
 
 export class WeaponSystem {
-  constructor(net) {
-    this.net    = net;
-    this.ammo   = MAX_AMMO;
+  constructor(net, sound = null) {
+    this.net     = net;
+    this.sound   = sound;
+    this.ammo    = MAX_AMMO;
     this.maxAmmo = MAX_AMMO;
 
     this._reloading    = false;
@@ -44,15 +45,17 @@ export class WeaponSystem {
   tryFire(camera, playerPosition, playerYaw, playerPitch) {
     const now = performance.now();
 
-    if (this._reloading) return false;
+    if (this._reloading) { return false; }
     if (now - this._lastFireTime < FIRE_INTERVAL) return false;
     if (this.ammo <= 0) {
+      this.sound?.playEmpty();
       this.reload();
       return false;
     }
 
     this._lastFireTime = now;
     this.ammo--;
+    this.sound?.playShoot();
 
     // Build ray from player eye position
     const eyeX = playerPosition.x;
@@ -85,6 +88,7 @@ export class WeaponSystem {
     if (this._reloading || this.ammo === this.maxAmmo) return;
     this._reloading = true;
     this._reloadEnd = performance.now() + RELOAD_TIME;
+    this.sound?.playReload();
     setTimeout(() => {
       this._reloading = false;
       this.ammo = this.maxAmmo;

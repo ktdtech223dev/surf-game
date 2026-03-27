@@ -10,20 +10,12 @@ function run(cmd) {
 }
 
 const log = [];
-
-log.push('=== git add ===');
-log.push(run('git add src/ index.html git-push.mjs').out || '(none)');
-
-log.push('\n=== git status ===');
+log.push(run('git add src/ index.html git-push.mjs').out || '(staged)');
 log.push(run('git status --short').out);
-
-log.push('\n=== git commit ===');
-const commit = run('git commit -m "Phase 5: Section 3 ramp, checkpoints, death overlay, finish banner, leaderboard, ghost color"');
-log.push(commit.out);
-
-log.push('\n=== git push ===');
-const push = run('git push origin master');
-log.push(push.ok ? '[OK] pushed to master' : '[FAILED]\n' + push.out);
+const c = run('git commit -m "Phase 6: weapon sounds, reconnect, section indicator, server rate-limit + position validation"');
+log.push(c.out);
+const p = run('git push origin master');
+log.push(p.ok ? '[OK] pushed' : '[FAILED] ' + p.out);
 
 const output = log.join('\n');
 const s = createServer((_, res) => { res.writeHead(200); res.end(output); });

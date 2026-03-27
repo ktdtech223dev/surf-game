@@ -37,7 +37,7 @@ const spawn = getSpawnPosition();
 input.yaw = Math.PI;
 
 const collisionWorld = buildTestMap(renderer);
-const weapon = new WeaponSystem(net);
+const weapon = new WeaponSystem(net, sound);
 
 // ── Apply saved settings ───────────────────────────────────────────────────────
 input.sensitivity = settings.sensitivity;
@@ -242,7 +242,7 @@ net.onRespawn = (hp) => {
   Vec3.set(playerState.velocity, 0, 0, 0);
 };
 
-net.onHitConfirm = () => { weapon.onHitConfirm(); sound.playHit(); };
+net.onHitConfirm = () => { weapon.onHitConfirm(); sound.playHit(); };  // hit confirm tick
 
 net.onPlayerList = (list) => {
   scoreboard.setLocalId(net.id);
