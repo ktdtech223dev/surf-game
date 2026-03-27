@@ -166,3 +166,41 @@ export { dailySeed, weeklySeed };
 
 export function getDailyMapId()  { return `daily_${dailySeed()}`; }
 export function getWeeklyMapId() { return `weekly_${weeklySeed()}`; }
+
+// ── MapCatalog-format procedural entry ────────────────────────────────────────
+const PALETTE_KEYS = ['dark_blue', 'ocean_green', 'sunset_red', 'ember', 'twilight', 'teal'];
+const DIFFICULTIES = ['beginner', 'intermediate', 'advanced', 'expert'];
+
+/**
+ * Returns a MapCatalog-format definition object generated deterministically
+ * from the given numeric seed. Compatible with MapFactory._buildFromDef().
+ */
+export function generateProceduralEntry(seed) {
+  const rng = mulberry32(seed);
+
+  const sectionCount = rng.int(2, 4);
+  const sections = [];
+  for (let i = 0; i < sectionCount; i++) {
+    sections.push({
+      w:     Math.round(rng.range(180, 320)),
+      depth: Math.round(rng.range(600, 1400)),
+      angle: 0,
+      dropY: -Math.round(rng.range(200, 600)),
+    });
+  }
+
+  const palIdx  = rng.int(0, PALETTE_KEYS.length - 1);
+  const diffIdx = rng.int(0, DIFFICULTIES.length - 1);
+
+  return {
+    id:         `proc_${seed}`,
+    name:       `Proc #${seed % 10000}`,
+    difficulty: DIFFICULTIES[diffIdx],
+    knifeId:    'knife_daily',
+    paletteKey: PALETTE_KEYS[palIdx],
+    desc:       `Procedural map (seed ${seed})`,
+    sections,
+    padLens:    [300, 200, 200, 200, 200, 400],
+    spawnY:     0,
+  };
+}

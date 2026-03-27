@@ -60,6 +60,37 @@ const distPath = join(__dirname, '../../dist');
 app.use(express.static(distPath));
 app.get('*', (_req, res) => res.sendFile(join(distPath, 'index.html')));
 
+// ── Online Lobby ──────────────────────────────────────────────────────────────
+const CATALOG_IDS = Array.from({ length: 32 }, (_, i) => `map_${String(i+1).padStart(2,'0')}`);
+const LOBBY_MS = 10 * 60 * 1000;
+
+const lobby = {
+  mapId:        'map_01',
+  nextRotateAt: Date.now() + LOBBY_MS,
+  skipVotes:    new Set(),
+};
+
+function pickLobbyMap(excludeId = null) {
+  if (Math.random() < 0.18) {
+    const seed = Math.floor(Math.random() * 999983) + 10007;
+    return `proc_${seed}`;
+  }
+  let pool = excludeId ? CATALOG_IDS.filter(id => id !== excludeId) : [...CATALOG_IDS];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function rotateLobbyMap(forced = false) {
+  lobby.mapId       = pickLobbyMap(lobby.mapId);
+  lobby.nextRotateAt = Date.now() + LOBBY_MS;
+  lobby.skipVotes.clear();
+  broadcastAll({ type: 'mapChange', mapId: lobby.mapId, nextRotateAt: lobby.nextRotateAt });
+  console.log(`[Lobby] ${forced ? 'Force-skipped' : 'Auto-rotated'} to ${lobby.mapId}`);
+}
+
+setInterval(() => {
+  if (Date.now() >= lobby.nextRotateAt) rotateLobbyMap(false);
+}, 10_000);
+
 // ── WebSocket Constants ───────────────────────────────────────────────────────
 const START_HP          = 100;
 const HIT_RADIUS        = 28;
@@ -144,6 +175,15 @@ wss.on('connection', (ws) => {
     if (pid !== id && p.snap) existing.push({ id: pid, name: p.name, color: p.color, hp: p.hp, ...p.snap });
   }
   send(ws, { type: 'welcome', id, name, count: players.size, existing });
+
+  send(ws, {
+    type: 'lobbyState',
+    mapId: lobby.mapId,
+    nextRotateAt: lobby.nextRotateAt,
+    skipVotes: lobby.skipVotes.size,
+    skipNeeded: Math.ceil(players.size * 0.51),
+    playerCount: players.size,
+  });
 
   const lb = wsLeaderboard.slice(0, MAX_LEADERBOARD);
   if (lb.length > 0) send(ws, { type: 'leaderboard', list: lb });
@@ -254,6 +294,23 @@ wss.on('connection', (ws) => {
 
       case 'ping': {
         send(ws, { type: 'pong', t: msg.t });
+        break;
+      }
+
+      case 'voteSkip': {
+        lobby.skipVotes.add(id);
+        const needed = Math.max(1, Math.ceil(players.size * 0.51));
+        broadcastAll({
+          type: 'lobbyState',
+          mapId: lobby.mapId,
+          nextRotateAt: lobby.nextRotateAt,
+          skipVotes: lobby.skipVotes.size,
+          skipNeeded: needed,
+          playerCount: players.size,
+        });
+        if (lobby.skipVotes.size >= needed) {
+          rotateLobbyMap(true);
+        }
         break;
       }
     }

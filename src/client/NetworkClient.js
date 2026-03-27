@@ -29,6 +29,9 @@ export class NetworkClient {
     this.onMetaUpdate  = null; // (id, name, color) → void
     this.onFinish      = null; // ({ id, name, time }) → void
     this.onLeaderboard = null; // (list) → void
+    this.onLobbyState  = null; // (state) => void
+    this.onMapChange   = null; // (mapId, nextRotateAt) => void
+    this.lobbyState    = null; // latest lobby state object
 
     this._pingInterval    = null;
     this._pingSentAt      = 0;
@@ -161,6 +164,23 @@ export class NetworkClient {
       case 'pong':
         this.pingMs = Math.round(performance.now() - this._pingSentAt);
         break;
+
+      case 'lobbyState': {
+        const state = {
+          mapId:        msg.mapId,
+          nextRotateAt: msg.nextRotateAt,
+          skipVotes:    msg.skipVotes ?? 0,
+          skipNeeded:   msg.skipNeeded ?? 1,
+          playerCount:  msg.playerCount ?? 1,
+        };
+        this.lobbyState = state;
+        if (this.onLobbyState) this.onLobbyState(state);
+        break;
+      }
+
+      case 'mapChange':
+        if (this.onMapChange) this.onMapChange(msg.mapId, msg.nextRotateAt);
+        break;
     }
   }
 
@@ -198,6 +218,10 @@ export class NetworkClient {
 
   sendChat(text) {
     this._send({ type: 'chat', text });
+  }
+
+  sendVoteSkip() {
+    this._send({ type: 'voteSkip' });
   }
 
   _sendPing() {

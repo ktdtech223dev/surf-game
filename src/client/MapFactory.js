@@ -7,6 +7,7 @@ import * as Vec3 from '../shared/physics/vec3.js';
 import { CollisionWorld } from '../shared/physics/CollisionWorld.js';
 import { MAP_BY_ID } from './MapCatalog.js';
 import { getPalette, getAmbiance, makeMat, makeEdgeMat, buildGate } from './ArtStyle.js';
+import { generateProceduralEntry } from './ProceduralMapGen.js';
 
 // Tag for cleanup
 const TAG = 'mapObj';
@@ -21,16 +22,30 @@ export const MapFactory = {
 
   /**
    * Build map visuals + physics. Returns { mapDesc, collisionWorld }.
+   * Dispatches to _buildFromDef after resolving the definition.
    */
   build(mapId, scene) {
     this.clear(scene);
 
     const def = MAP_BY_ID[mapId];
+
+    // Handle procedural maps
+    if (!def && mapId.startsWith('proc_')) {
+      const seed = parseInt(mapId.slice(5)) || 12345;
+      const procDef = generateProceduralEntry(seed);
+      return this._buildFromDef(mapId, procDef, scene);
+    }
     if (!def) {
       console.warn('[MapFactory] Unknown map:', mapId, '— falling back to map_01');
       return this.build('map_01', scene);
     }
+    return this._buildFromDef(mapId, def, scene);
+  },
 
+  /**
+   * Build map from a definition object directly.
+   */
+  _buildFromDef(mapId, def, scene) {
     const pal   = getPalette(def.paletteKey);
     const amb   = getAmbiance(def.difficulty);
     const world = new CollisionWorld();
