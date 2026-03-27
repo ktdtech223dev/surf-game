@@ -9,7 +9,8 @@
       "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm run build 2>&1\")",
       "Bash(powershell -Command \"cd E:\\\\SurfGame; npm run build\")",
       "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm run build\")",
-      "Bash(powershell -Command \"Set-Location E:\\\\SurfGame; npm run build\")"
+      "Bash(powershell -Command \"Set-Location E:\\\\SurfGame; npm run build\")",
+      "Bash(start powershell:*)"
     ]
   }
 }
