@@ -104,9 +104,7 @@ document.getElementById('settings-btn')?.addEventListener('click', () => {
 
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && !input.chatOpen) {
-    if (settings.isPanelOpen()) {
-      settings.closePanel();
-    } else if (pauseMenu.visible) {
+    if (pauseMenu.visible) {
       pauseMenu.hide();
       renderer.renderer.domElement.requestPointerLock?.();
     } else if (input.locked) {
@@ -118,8 +116,12 @@ document.addEventListener('keydown', (e) => {
     knifeInst.toggleInspect();
   }
   // M key: open main menu
-  if (e.code === 'KeyM' && input.locked && !input.chatOpen && !settings.isPanelOpen()) {
+  if (e.code === 'KeyM' && input.locked && !input.chatOpen && !pauseMenu.visible) {
     mainMenu.show();
+  }
+  // R key: quick respawn while dead
+  if (e.code === 'KeyR' && !localAlive && !input.chatOpen) {
+    net.sendRequestRespawn();
   }
 });
 
@@ -146,7 +148,7 @@ function _setHp(hp) {
 }
 function _showDeath()   { localAlive = false; _deadUntil = performance.now() + 2000; if (deathEl) deathEl.style.display = 'flex'; _flashDamage(true); }
 function _hideDeath()   { if (deathEl) deathEl.style.display = 'none'; }
-function _tickDeath()   { if (!deathEl || localAlive) return; const rem = Math.max(0, _deadUntil - performance.now()) / 1000; if (deathCount) deathCount.textContent = rem > 0 ? `Respawning in ${rem.toFixed(1)}s…` : 'Respawning…'; }
+function _tickDeath()   { if (!deathEl || localAlive) return; const rem = Math.max(0, _deadUntil - performance.now()) / 1000; if (deathCount) deathCount.textContent = rem > 0 ? `Respawning in ${rem.toFixed(1)}s… (Press R to respawn now)` : 'Respawning… (Press R to respawn now)'; }
 function _flashDamage(hard = false) {
   if (!dmgVign) return;
   dmgVign.style.opacity    = hard ? '1' : '0.7';
@@ -376,18 +378,14 @@ const mainMenu = new MainMenu(async (mapId) => {
 mainMenu.onJoinOnline = _joinOnline;
 
 // ── Pause menu ────────────────────────────────────────────────────────────────
-const pauseMenu = new PauseMenu(input);
+const pauseMenu = new PauseMenu(input, settings);
 pauseMenu.onResume    = () => { renderer.renderer.domElement.requestPointerLock?.(); };
 pauseMenu.onChangeMap = async (mapId) => {
+  _mode = 'solo';
   await _loadMap(mapId);
   setTimeout(() => renderer.renderer.domElement.requestPointerLock?.(), 200);
 };
 pauseMenu.onMainMenu  = () => { mainMenu.show(); };
-pauseMenu.onSettings  = () => {
-  // Re-lock first so settings panel opens in game context
-  renderer.renderer.domElement.requestPointerLock?.();
-  setTimeout(() => settings.openPanel(), 150);
-};
 
 // ── Network callbacks ──────────────────────────────────────────────────────────
 net.onWelcome = (id, name) => {

@@ -10,9 +10,18 @@ function run(cmd) {
 }
 
 const log = [];
-log.push(run('git add src/ index.html git-push.mjs').out || '(staged)');
-log.push(run('git status --short').out);
-const c = run('git commit -m "Phase 6: weapon sounds, reconnect, section indicator, server rate-limit + position validation"');
+const files = [
+  'src/client/Renderer.js',
+  'src/client/ProceduralMapGen.js',
+  'src/client/MapFactory.js',
+  'src/client/main.js',
+  'src/client/NetworkClient.js',
+  'src/client/MainMenu.js',
+  'src/server/server.js',
+].join(' ');
+
+log.push(run(`git add ${files}`).out || '(staged)');
+const c = run('git commit -m "Feat: map stacking fix, solo/online mode, online lobby with vote-skip, proc_ map pipeline"');
 log.push(c.out);
 const p = run('git push origin master');
 log.push(p.ok ? '[OK] pushed' : '[FAILED] ' + p.out);

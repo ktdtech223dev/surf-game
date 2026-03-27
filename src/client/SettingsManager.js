@@ -161,6 +161,13 @@ export class SettingsManager {
     document.getElementById('cfg-close')?.addEventListener('click', () => this.closePanel());
   }
 
+  /** Set a single value, save, and fire onChange — used by PauseMenu sliders */
+  set(key, value) {
+    this._data[key] = value;
+    this._save();
+    this._onChange?.(key, value);
+  }
+
   /** Called whenever a setting changes live. Set in main.js */
   onChange(fn) { this._onChange = fn; }
 }

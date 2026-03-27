@@ -224,6 +224,10 @@ export class NetworkClient {
     this._send({ type: 'voteSkip' });
   }
 
+  sendRequestRespawn() {
+    this._send({ type: 'requestRespawn' });
+  }
+
   _sendPing() {
     this._pingSentAt = performance.now();
     this._send({ type: 'ping', t: this._pingSentAt });

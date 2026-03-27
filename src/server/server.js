@@ -297,6 +297,18 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'requestRespawn': {
+        // Instant respawn on R-key request while dead
+        const rp = players.get(id);
+        if (rp && !rp.alive) {
+          rp.hp    = START_HP;
+          rp.alive = true;
+          send(ws, { type: 'respawn', hp: START_HP });
+          broadcastAll({ type: 'playerHp', id, hp: START_HP });
+        }
+        break;
+      }
+
       case 'voteSkip': {
         lobby.skipVotes.add(id);
         const needed = Math.max(1, Math.ceil(players.size * 0.51));
