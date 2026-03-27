@@ -127,14 +127,26 @@ document.getElementById('settings-btn')?.addEventListener('click', () => {
   settings.openPanel();
 });
 
+// ── Pointer lock → auto-show pause menu ───────────────────────────────────────
+// The browser releases pointer lock BEFORE keydown fires for Escape, so we can
+// never check input.locked in the keydown handler to show the menu.  Instead,
+// listen for the native pointerlockchange event.
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement) return; // lock acquired – nothing to do
+  // Lock was released.  Only show the pause menu when actually in-game.
+  const inGame = collisionWorld && !mainMenu.visible && !loadoutMenu.visible;
+  if (inGame && !pauseMenu.visible) {
+    pauseMenu.show();
+  }
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && !input.chatOpen) {
     if (pauseMenu.visible) {
       pauseMenu.hide();
       renderer.renderer.domElement.requestPointerLock?.();
-    } else if (input.locked) {
-      pauseMenu.show();
     }
+    // (showing the menu is now handled by pointerlockchange above)
   }
   // F key: knife inspect
   if (e.code === 'KeyF' && input.locked && !input.chatOpen) {

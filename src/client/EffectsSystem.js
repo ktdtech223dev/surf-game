@@ -105,8 +105,9 @@ export class EffectsSystem {
 
   // ── Speed lines intensity (0–1) ────────────────────────────────────────────
 
-  setSpeed(hSpeed) {
-    this._targetSpeedIntensity = Math.max(0, Math.min(1, (hSpeed - 500) / 1200));
+  setSpeed(_hSpeed) {
+    // Speed lines disabled — kept for API compatibility
+    this._targetSpeedIntensity = 0;
   }
 
   // ── Floating combat text ───────────────────────────────────────────────────
@@ -209,9 +210,10 @@ export class EffectsSystem {
       cameraOffset.y += this._shakeY;
     }
 
-    // Speed lines
-    this._speedIntensity += (this._targetSpeedIntensity - this._speedIntensity) * 0.08;
-    this._drawSpeedLines(this._speedIntensity);
+    // Speed lines (disabled — canvas kept but always cleared)
+    if (this._speedCtx && this._speedCanvas) {
+      this._speedCtx.clearRect(0, 0, this._speedCanvas.width, this._speedCanvas.height);
+    }
 
     // Particles
     for (let i = this._activeParticles.length - 1; i >= 0; i--) {
