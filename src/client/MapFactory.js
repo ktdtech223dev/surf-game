@@ -138,6 +138,23 @@ export const MapFactory = {
       _buildPad(scene, world, 0, curY - 10, curZ + padLen / 2, 700, 20, padLen, pal, TAG);
       curZ += padLen;
 
+      // ── Curved section overlaid on this connector pad (if defined) ────
+      if (def.curvedSections) {
+        for (const cs of def.curvedSections) {
+          if (cs.afterPad === si) {
+            // Place curve at the start of this connector pad
+            const curveStartZ = curZ - padLen + 20;
+            _buildCurvedSection(
+              scene, world,
+              0, curveStartZ,
+              cs.radius, cs.angle,
+              cs.width, cs.height ?? 18,
+              curY, pal
+            );
+          }
+        }
+      }
+
       // ── Kill zone below this section ──────────────────────────────────
       world.addKillZone(
         Vec3.create(-4000, endY - 200, startZ),
@@ -200,6 +217,65 @@ export const MapFactory = {
     return { mapDesc, collisionWorld: world };
   },
 };
+
+// ── Curved section builder ────────────────────────────────────────────────────
+/**
+ * _buildCurvedSection — Adds 8 short angled ramp box segments arranged in an arc,
+ * approximating a smooth S-turn or U-turn.
+ *
+ * @param {THREE.Scene}   scene
+ * @param {CollisionWorld} collisionBoxes  — collision world to register floors into
+ * @param {number} x       — center X of the arc
+ * @param {number} z       — start Z of the arc
+ * @param {number} radius  — arc radius (controls how wide the curve is)
+ * @param {number} angle   — total arc sweep in radians (positive = right turn, negative = left)
+ * @param {number} width   — width of each segment box
+ * @param {number} height  — height (vertical thickness) of each segment box
+ * @param {number} y       — base Y of the section
+ * @param {object} pal     — palette object from getPalette()
+ * @returns {{ endX, endZ }}  — XZ position after the curve
+ */
+function _buildCurvedSection(scene, collisionBoxes, x, z, radius, angle, width, height, y, pal) {
+  const SEGMENTS  = 8;
+  const arcStep   = angle / SEGMENTS;
+  const segLen    = Math.abs(radius * arcStep);  // arc length per segment
+
+  let curAngle = 0;  // accumulated angle along the arc (starts pointing in +Z direction)
+  let cx = x;
+  let cz = z;
+
+  for (let i = 0; i < SEGMENTS; i++) {
+    const midAngle = curAngle + arcStep * 0.5;
+    const cosA = Math.cos(midAngle);
+    const sinA = Math.sin(midAngle);
+
+    // Segment center position
+    const segCx = cx + sinA * segLen * 0.5;
+    const segCz = cz + cosA * segLen * 0.5;
+
+    // Build box for this segment (rotated by midAngle)
+    const geo  = new THREE.BoxGeometry(width, height, segLen + 2);
+    const mesh = new THREE.Mesh(geo, makeMat(pal.ramp ?? 0x112233));
+    mesh.position.set(segCx, y - height / 2, segCz);
+    mesh.rotation.y = -midAngle;  // negate so the box faces along the travel direction
+    mesh.userData[TAG] = true;
+    mesh.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({ color: pal.edge ?? 0x00cfff, opacity: 0.6, transparent: true })
+    ));
+    scene.add(mesh);
+
+    // Register as a physics floor (axis-aligned approximation per segment)
+    collisionBoxes.addFloor(segCx, segCz, width, segLen + 2, y);
+
+    // Advance to the end of this segment
+    curAngle += arcStep;
+    cx += Math.sin(curAngle) * segLen;
+    cz += Math.cos(curAngle) * segLen;
+  }
+
+  return { endX: cx, endZ: cz };
+}
 
 // ── Visual helpers ────────────────────────────────────────────────────────────
 

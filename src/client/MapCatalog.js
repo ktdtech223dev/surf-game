@@ -20,6 +20,11 @@ export const MAP_CATALOG = [
       { w: 300, depth: 800, angle: 0.30, dropY: -240 },
     ],
     padLens: [300, 300, 350], spawnY: 0,
+    // Curved connector: gentle S-turn between the two ramp sections
+    curvedSections: [
+      { afterPad: 0, radius: 400, angle:  0.55, width: 280, height: 18 },
+      { afterPad: 1, radius: 350, angle: -0.45, width: 260, height: 18 },
+    ],
   },
   {
     id: 'map_02', name: 'Coastal',    difficulty: DIFFICULTY.BEGINNER,
@@ -103,6 +108,12 @@ export const MAP_CATALOG = [
       { w: 250, depth: 850, angle: 0.38, dropY: -323 },
     ],
     padLens: [220, 220, 220, 280], spawnY: 0,
+    // Curved U-turn after first pad and sharp S after second
+    curvedSections: [
+      { afterPad: 0, radius: 280, angle:  0.70, width: 220, height: 18 },
+      { afterPad: 1, radius: 260, angle: -0.65, width: 210, height: 18 },
+      { afterPad: 2, radius: 240, angle:  0.60, width: 200, height: 18 },
+    ],
   },
   {
     id: 'map_10', name: 'Canyon',     difficulty: DIFFICULTY.INTERMEDIATE,
@@ -194,6 +205,13 @@ export const MAP_CATALOG = [
       { w: 205, depth: 900,  angle: 0.48, dropY: -433 },
     ],
     padLens: [190, 190, 190, 190, 250], spawnY: 0,
+    // Aggressive curved transitions — tight S-turns between each section
+    curvedSections: [
+      { afterPad: 0, radius: 220, angle:  0.80, width: 190, height: 18 },
+      { afterPad: 1, radius: 210, angle: -0.75, width: 185, height: 18 },
+      { afterPad: 2, radius: 205, angle:  0.78, width: 182, height: 18 },
+      { afterPad: 3, radius: 200, angle: -0.72, width: 178, height: 18 },
+    ],
   },
   {
     id: 'map_18', name: 'Tempest',    difficulty: DIFFICULTY.ADVANCED,

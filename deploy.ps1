@@ -6,7 +6,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host "BUILD FAILED" -ForegroundColor Red; exit 
 
 Write-Host "=== Git commit + push ===" -ForegroundColor Cyan
 git add -A
-git commit -m "Fix pointer-lock capture: separate menu/game states, player spawns only on map select"
+git commit -m "Radio stations, toast level-up, solo XP guard, respawn fix, curved maps, round-end winner, debug fixes"
 $ghToken = (gh auth token 2>&1)
 if ($ghToken -and "$ghToken" -notmatch "error|not logged") {
   git push "https://$($ghToken.Trim())@github.com/ktdtech223dev/surf-game.git" master

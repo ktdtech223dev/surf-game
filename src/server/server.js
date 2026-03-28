@@ -70,6 +70,7 @@ const lobby = {
   mapId:        'map_01',
   nextRotateAt: Date.now() + LOBBY_MS,
   skipVotes:    new Set(),
+  roundTimes:   [],  // [{ name, time }] sorted by time for current round
 };
 
 function pickLobbyMap(excludeId = null) {
@@ -82,9 +83,22 @@ function pickLobbyMap(excludeId = null) {
 }
 
 function rotateLobbyMap(forced = false) {
-  lobby.mapId       = pickLobbyMap(lobby.mapId);
+  // Broadcast round end with winner before rotating
+  const prevMapId = lobby.mapId;
+  if (lobby.roundTimes.length > 0) {
+    const winner = lobby.roundTimes[0]; // already sorted ascending by time
+    broadcastAll({
+      type:   'roundEnd',
+      winner: { name: winner.name, time: winner.time },
+      mapId:  prevMapId,
+      times:  lobby.roundTimes,
+    });
+  }
+
+  lobby.mapId        = pickLobbyMap(lobby.mapId);
   lobby.nextRotateAt = Date.now() + LOBBY_MS;
   lobby.skipVotes.clear();
+  lobby.roundTimes   = [];
   broadcastAll({ type: 'mapChange', mapId: lobby.mapId, nextRotateAt: lobby.nextRotateAt });
   console.log(`[Lobby] ${forced ? 'Force-skipped' : 'Auto-rotated'} to ${lobby.mapId}`);
 }
@@ -283,6 +297,21 @@ wss.on('connection', (ws) => {
         recordWsFinish(player.name, mapId, timeSec);
         broadcastAll({ type: 'finish', id, name: player.name, mapId, time: timeSec });
         broadcastAll({ type: 'leaderboard', list: wsLeaderboard.slice(0, MAX_LEADERBOARD) });
+
+        // Track round times for the current map round (only if finish is on the current lobby map)
+        if (mapId === lobby.mapId) {
+          const existingIdx = lobby.roundTimes.findIndex(e => e.name === player.name);
+          if (existingIdx !== -1) {
+            // Update only if this is a faster time
+            if (timeSec < lobby.roundTimes[existingIdx].time) {
+              lobby.roundTimes[existingIdx].time = timeSec;
+            }
+          } else {
+            lobby.roundTimes.push({ name: player.name, time: timeSec });
+          }
+          // Keep sorted ascending by time
+          lobby.roundTimes.sort((a, b) => a.time - b.time);
+        }
         break;
       }
 

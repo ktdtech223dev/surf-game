@@ -6,6 +6,7 @@
  * Resume button / Escape key re-acquires pointer lock.
  */
 import { MAPS_BY_DIFF, DIFFICULTY } from './MapCatalog.js';
+import { RadioSystem } from './RadioSystem.js';
 
 const DIFF_COLOR = {
   [DIFFICULTY.BEGINNER]:     '#22c55e',
@@ -31,6 +32,7 @@ export class PauseMenu {
     // Set by main.js
     this._statTracker = null;
     this._crosshair   = null;
+    this._radio       = null; // RadioSystem instance
 
     // Callbacks
     this.onResume    = null;
@@ -127,6 +129,7 @@ export class PauseMenu {
       ${btn('pm-settings', '⚙', 'Settings')}
       ${btn('pm-stats',    '📊', 'Statistics')}
       ${btn('pm-crosshair','✛', 'Crosshair')}
+      ${btn('pm-radio',    '📻', 'Radio')}
       <div style="flex:1;min-height:20px"></div>
       ${divider}
       ${btn('pm-mainmenu', '⌂', 'Main Menu',   false, false)}
@@ -149,6 +152,10 @@ export class PauseMenu {
     document.getElementById('pm-crosshair')?.addEventListener('click', () => {
       this._panel = 'crosshair'; this._renderPanel(); this._highlightNav('pm-crosshair');
     });
+
+    document.getElementById('pm-radio')?.addEventListener('click', () => {
+      this._panel = 'radio'; this._renderPanel(); this._highlightNav('pm-radio');
+    });
     document.getElementById('pm-mainmenu')?.addEventListener('click', () => {
       this.hide();
       this.onMainMenu?.();
@@ -156,7 +163,7 @@ export class PauseMenu {
   }
 
   _highlightNav(activeId) {
-    ['pm-mapsel','pm-settings','pm-stats','pm-crosshair'].forEach(id => {
+    ['pm-mapsel','pm-settings','pm-stats','pm-crosshair','pm-radio'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
       if (id === activeId) {
@@ -189,6 +196,12 @@ export class PauseMenu {
         if (this._crosshair) {
           const wrap = document.getElementById('pm-crosshair-wrap');
           if (wrap) this._crosshair.openEditor(wrap);
+        }
+        break;
+      case 'radio':
+        panel.innerHTML = '<div id="pm-radio-wrap"></div>';
+        if (this._radio) {
+          this._radio.renderPanel(document.getElementById('pm-radio-wrap'));
         }
         break;
       default:

@@ -31,6 +31,7 @@ export class NetworkClient {
     this.onLeaderboard = null; // (list) → void
     this.onLobbyState  = null; // (state) => void
     this.onMapChange   = null; // (mapId, nextRotateAt) => void
+    this.onRoundEnd    = null; // ({ winner: {name,time}, mapId, times }) => void
     this.lobbyState    = null; // latest lobby state object
 
     this._pingInterval    = null;
@@ -180,6 +181,14 @@ export class NetworkClient {
 
       case 'mapChange':
         if (this.onMapChange) this.onMapChange(msg.mapId, msg.nextRotateAt);
+        break;
+
+      case 'roundEnd':
+        if (this.onRoundEnd) this.onRoundEnd({
+          winner: msg.winner,
+          mapId:  msg.mapId,
+          times:  msg.times || [],
+        });
         break;
     }
   }

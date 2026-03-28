@@ -104,19 +104,18 @@ export class CrosshairSystem {
     bind('ch-gap',    'gap',     parseFloat, 'ch-gap-lbl');
     bind('ch-thick',  'thick',   parseFloat, 'ch-thick-lbl');
     bind('ch-alpha',  'alpha',   parseFloat, 'ch-alpha-lbl');
-    bind('ch-outline','outline', v => v === 'true' || v === true);
-    bind('ch-dot',    'dot',     v => v === 'true' || v === true);
-    bind('ch-dynamic','dynamic', v => v === 'true' || v === true);
+    // Note: checkboxes are handled by the 'change' listener block below.
+    // Calling bind() with el.value for checkboxes would always yield "on", not a boolean.
 
-    // Checkbox events
-    ['ch-outline','ch-dot','ch-dynamic'].forEach(id => {
+    // Checkbox events — use el.checked (not el.value which is always "on")
+    const _checkboxKeyMap = { 'ch-outline': 'outline', 'ch-dot': 'dot', 'ch-dynamic': 'dynamic' };
+    ['ch-outline', 'ch-dot', 'ch-dynamic'].forEach(id => {
       const el = container.querySelector(`#${id}`);
-      if (el) el.addEventListener('change', () => {
-        this._cfg[id.replace('ch-','').replace('-','')] = el.checked;
-        // Map id to correct key
-        const map = {'ch-outline':'outline','ch-dot':'dot','ch-dynamic':'dynamic'};
-        this._cfg[map[id]] = el.checked;
-        this._save(); this._draw();
+      if (!el) return;
+      el.addEventListener('change', () => {
+        this._cfg[_checkboxKeyMap[id]] = el.checked;
+        this._save();
+        this._draw();
         this._drawPreview(container.querySelector('#ch-preview'));
       });
     });

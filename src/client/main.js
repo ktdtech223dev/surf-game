@@ -38,6 +38,7 @@ import { KillStreakSystem }  from './KillStreakSystem.js';
 import { CrosshairSystem }  from './CrosshairSystem.js';
 import { StatTracker }      from './StatTracker.js';
 import { WeaponBob }        from './WeaponBob.js';
+import { RadioSystem }      from './RadioSystem.js';
 
 // ── Clear map geometry from scene (preserves permanent objects) ────────────────
 function _clearMap(scene) {
@@ -92,6 +93,7 @@ const crosshair = new CrosshairSystem();
 const statTrack = new StatTracker();
 const _shakeOffset = { x: 0, y: 0 };
 const weaponBob    = new WeaponBob();
+const radio        = new RadioSystem();
 
 // Physics + map state
 const playerState = createPlayerState();
@@ -328,16 +330,18 @@ async function _showFinish(timeSec) {
     }
   }
 
-  // Show reward screen after 1.5s (let finish banner show first)
-  const totalXP  = xpGains.reduce((s, g) => s + g.amount, 0);
-  const unlocks  = [];  // level-up unlocks come via xpSys.onLevelUp callback
-  setTimeout(() => {
-    rewardScr.show({
-      xpGains, xpSystem: xpSys, oldLevel, oldXP,
-      unlocks: _pendingUnlocks.splice(0),
-    });
-    _pendingUnlocks.length = 0;
-  }, 1600);
+  // Show reward screen after 1.5s — online mode only (not solo)
+  if (_mode !== 'solo') {
+    setTimeout(() => {
+      rewardScr.show({
+        xpGains, xpSystem: xpSys, oldLevel, oldXP,
+        unlocks: _pendingUnlocks.splice(0),
+      });
+      _pendingUnlocks.length = 0;
+    }, 1600);
+  } else {
+    _pendingUnlocks.length = 0; // clear so they don't pile up
+  }
 
   _updateXPHud();
   setTimeout(() => { if (finishBanner) finishBanner.style.display = 'none'; }, 6000);
@@ -579,6 +583,7 @@ pauseMenu.onMainMenu  = () => {
 };
 pauseMenu._statTracker = statTrack;
 pauseMenu._crosshair   = crosshair;
+pauseMenu._radio       = radio;
 
 // ── Network callbacks ──────────────────────────────────────────────────────────
 net.onWelcome = (id, name) => {
@@ -636,6 +641,26 @@ net.onMapChange = async (mapId, nextRotateAt) => {
     _showMapChangeNotice(mapId);
   }
   _updateOnlineHud();
+};
+net.onRoundEnd = ({ winner, mapId, times }) => {
+  if (_mode !== 'online') return;
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position:fixed; top:35%; left:50%; transform:translate(-50%,-50%);
+    background:rgba(0,0,0,0.92); border:1px solid #ffd700;
+    color:#ffd700; font-family:monospace; font-size:16px; font-weight:bold;
+    padding:18px 36px; border-radius:8px; z-index:9100; text-align:center;
+    animation: fadeOut 0.4s 5s forwards; min-width:280px;
+  `;
+  const fmt = t => { const m=Math.floor(t/60),s=Math.floor(t%60),ms=Math.round((t%1)*1000); return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`; };
+  const topRows = times.slice(0, 5).map((e, i) =>
+    `<div style="font-size:12px;color:${i===0?'#ffd700':'#aaa'};margin-top:4px">${i+1}. ${e.name}  ${fmt(e.time)}</div>`
+  ).join('');
+  el.innerHTML = `<div>ROUND OVER — ${mapId.replace('_',' ').toUpperCase()}</div>
+    <div style="font-size:13px;color:#fff;margin-top:6px">WINNER: ${winner.name} (${fmt(winner.time)})</div>
+    ${topRows}`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 5500);
 };
 net.connect();
 

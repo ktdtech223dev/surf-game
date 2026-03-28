@@ -30,14 +30,15 @@ export class KillStreakSystem {
     this._onXP      = onXPBonus;
     this._sound     = sound;
 
-    this._kills        = [];   // timestamps of kills in current streak
-    this._streakCount  = 0;
-    this._totalKills   = 0;
-    this._firstBlood   = false;
-    this._dominated    = false;
-    this._el           = null;
-    this._queue        = [];   // queued announcements
-    this._showing      = false;
+    this._kills          = [];   // timestamps of kills in current streak
+    this._streakCount    = 0;
+    this._totalKills     = 0;
+    this._firstBlood     = false;
+    this._dominated      = false;
+    this._announced1200  = false;
+    this._el             = null;
+    this._queue          = [];   // queued announcements
+    this._showing        = false;
 
     this._buildEl();
   }
