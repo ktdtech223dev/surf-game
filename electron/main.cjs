@@ -3,16 +3,18 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path  = require('path');
 const http  = require('http');
+const https = require('https');
 const fs    = require('fs');
 const url   = require('url');
 
-const WINDOW_MIN_W = 1024;
-const WINDOW_MIN_H = 600;
+const WINDOW_MIN_W  = 1024;
+const WINDOW_MIN_H  = 600;
+const RAILWAY_HOST  = 'surf-game-production.up.railway.app';
 
 let mainWindow = null;
 let devServer  = null;
 
-// ── Local static file server ───────────────────────────────────────────────
+// ── Local static file server + Railway API proxy ────────────────────────────
 
 const MIME = {
   '.html': 'text/html',
@@ -39,10 +41,79 @@ function distDir() {
     : path.join(__dirname, '../dist');
 }
 
+/**
+ * Proxy an /api/* request to the Railway server.
+ * Reads the full body first, then forwards with all headers.
+ */
+function proxyToRailway(req, res) {
+  const parsedUrl = url.parse(req.url);
+  const railwayPath = parsedUrl.path; // e.g. /api/auth/register
+
+  const chunks = [];
+  req.on('data', c => chunks.push(c));
+  req.on('end', () => {
+    const body = Buffer.concat(chunks);
+
+    const options = {
+      hostname: RAILWAY_HOST,
+      port:     443,
+      path:     railwayPath,
+      method:   req.method,
+      headers: {
+        ...req.headers,
+        host:             RAILWAY_HOST,
+        'content-length': body.length,
+      },
+    };
+
+    const proxy = https.request(options, (railRes) => {
+      // Forward CORS headers so the page is happy
+      const forwarded = {
+        'content-type':                 railRes.headers['content-type'] || 'application/json',
+        'access-control-allow-origin':  '*',
+        'access-control-allow-headers': 'Content-Type, Authorization',
+        'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      };
+      if (railRes.headers['authorization']) forwarded['authorization'] = railRes.headers['authorization'];
+      res.writeHead(railRes.statusCode, forwarded);
+      railRes.pipe(res);
+    });
+
+    proxy.on('error', (err) => {
+      console.error('[Proxy] Railway request failed:', err.message);
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Could not reach game server' }));
+    });
+
+    if (body.length > 0) proxy.write(body);
+    proxy.end();
+  });
+}
+
 function startFileServer() {
   return new Promise((resolve) => {
     devServer = http.createServer((req, res) => {
-      let reqPath = url.parse(req.url).pathname;
+      const parsedPath = url.parse(req.url).pathname;
+
+      // ── OPTIONS preflight ────────────────────────────────────────────────
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin':  '*',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        });
+        res.end();
+        return;
+      }
+
+      // ── /api/* → proxy to Railway ────────────────────────────────────────
+      if (parsedPath.startsWith('/api')) {
+        proxyToRailway(req, res);
+        return;
+      }
+
+      // ── Static files ─────────────────────────────────────────────────────
+      let reqPath = parsedPath;
       if (reqPath === '/') reqPath = '/index.html';
 
       const safePath = path.join(distDir(), reqPath.replace(/\.\./g, ''));

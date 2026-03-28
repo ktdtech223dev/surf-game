@@ -6,11 +6,9 @@
  * - Token held in memory only
  */
 
-// In Electron the preload sets window.__gameServer__ to the Railway host.
-// Fall back to relative /api for normal browser/web deployment.
-const API_BASE = (typeof window !== 'undefined' && window.__gameServer__)
-  ? `https://${window.__gameServer__}/api`
-  : '/api';
+// Always use relative /api — the Electron file server proxies /api/* to Railway,
+// and the Railway deployment serves /api/* directly.
+const API_BASE = '/api';
 const RETRY_LIMIT = 3;
 const RETRY_DELAY = 2000; // ms
 

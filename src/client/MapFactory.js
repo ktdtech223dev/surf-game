@@ -22,7 +22,6 @@ export const MapFactory = {
 
   /**
    * Build map visuals + physics. Returns { mapDesc, collisionWorld }.
-   * Dispatches to _buildFromDef after resolving the definition.
    */
   build(mapId, scene) {
     this.clear(scene);
@@ -54,13 +53,19 @@ export const MapFactory = {
     scene.background = new THREE.Color(pal.sky);
     scene.fog        = new THREE.Fog(pal.fog, amb.fogNear, amb.fogFar);
 
+    // Remove old lights
     const oldLights = [];
     scene.traverse(obj => { if (obj.isLight) oldLights.push(obj); });
     oldLights.forEach(l => scene.remove(l));
+
+    // Main directional light
     const dir = new THREE.DirectionalLight(amb.lightColor ?? 0xffffff, amb.lightIntensity ?? 0.8);
     dir.position.set(200, 500, 200);
     scene.add(dir);
     scene.add(new THREE.AmbientLight(amb.ambientColor ?? 0x223344, amb.ambientIntensity ?? 0.4));
+
+    // ── Dynamic skybox ──────────────────────────────────────────────────────
+    _buildSkybox(scene, pal, amb, def.difficulty, TAG);
 
     // ── Build sections ──────────────────────────────────────────────────────
     const { sections, padLens, spawnY = 0 } = def;
@@ -68,7 +73,7 @@ export const MapFactory = {
     let curY = spawnY;
 
     // Spawn pad
-    const spawnLen = padLens[0] ?? 300;
+    const spawnLen = padLens[0] ?? 400;
     _buildPad(scene, world, 0, curY - 10, curZ + spawnLen / 2, 700, 20, spawnLen, pal, TAG);
     curZ += spawnLen;
 
@@ -78,16 +83,16 @@ export const MapFactory = {
     const sectionBounds = [];
 
     for (let si = 0; si < sections.length; si++) {
-      const sec    = sections[si];
-      const outerX = sec.w / 2 + 60;  // distance from center to outer edge
-      const startZ = curZ;
-      const startY = curY;
-      const endZ   = curZ + sec.depth;
+      const sec     = sections[si];
+      const outerX  = sec.w / 2 + 60;
+      const startZ  = curZ;
+      const startY  = curY;
+      const endZ    = curZ + sec.depth;
       const dropAbs = Math.abs(sec.dropY);
-      const endY   = curY + sec.dropY; // dropY is negative
+      const endY    = curY + sec.dropY; // negative
 
-      // ── Physics quads (exact geometry) ──────────────────────────────────
-      // Left ramp: outer edge at -outerX, inner edge at 0
+      // ── Physics quads (exact ramp geometry) ────────────────────────────
+      // Left ramp: outer edge at -outerX (high), inner edge at 0 (low)
       const lv0 = Vec3.create(-outerX, startY, startZ);
       const lv1 = Vec3.create(      0, endY,   startZ);
       const lv2 = Vec3.create(      0, endY,   endZ);
@@ -107,23 +112,24 @@ export const MapFactory = {
       _addRampMesh(scene, [lv0, lv1, lv2, lv3], pal.ramp, pal.edge, TAG);
       _addRampMesh(scene, [rv0, rv1, rv2, rv3], pal.ramp, pal.edge, TAG);
 
-      // ── Ceiling for narrower sections ─────────────────────────────────
-      if (sec.w < 280) {
+      // ── Ceiling for narrower advanced sections ────────────────────────
+      if (sec.w < 220) {
         const ceilW = outerX * 2 + 40;
-        const ceilH = outerX * 0.9;
+        const ceilH = outerX * 0.85;
         const midY  = (startY + endY) / 2 + ceilH;
         _buildBox(scene, 0, midY, startZ + sec.depth / 2,
           ceilW, 14, sec.depth, pal.ramp, pal.edge, TAG);
       }
 
-      // ── Side ledges (for players to recover) ─────────────────────────
-      const ledgeW  = 60;
+      // ── Side ledges ────────────────────────────────────────────────────
+      const ledgeW   = 60;
       const ledgeMidZ = startZ + sec.depth / 2;
       world.addFloor(-outerX - ledgeW / 2, ledgeMidZ, ledgeW, sec.depth, startY);
       world.addFloor( outerX + ledgeW / 2, ledgeMidZ, ledgeW, sec.depth, startY);
 
       // ── Checkpoint gate ───────────────────────────────────────────────
-      const gateColor = si === 0 ? 0x00ff88 : si === 1 ? 0x00aaff : 0xaa44ff;
+      const gateColor = [0x00ff88, 0x00aaff, 0xaa44ff, 0xff6600, 0xff00aa, 0xffff00,
+                         0x00ffcc, 0xff4400, 0x44ffaa][si % 9];
       const gate = buildGate({ x: 0, y: endY, z: endZ - 10, w: outerX * 2, h: 140, color: gateColor });
       gate.userData[TAG] = true;
       scene.add(gate);
@@ -134,21 +140,20 @@ export const MapFactory = {
       curY = endY;
 
       // ── Connector pad ─────────────────────────────────────────────────
-      const padLen = padLens[si + 1] ?? 220;
+      const padLen = padLens[si + 1] ?? 240;
       _buildPad(scene, world, 0, curY - 10, curZ + padLen / 2, 700, 20, padLen, pal, TAG);
       curZ += padLen;
 
-      // ── Curved section overlaid on this connector pad (if defined) ────
+      // ── Curved section on connector pad ──────────────────────────────
       if (def.curvedSections) {
         for (const cs of def.curvedSections) {
           if (cs.afterPad === si) {
-            // Place curve at the start of this connector pad
-            const curveStartZ = curZ - padLen + 20;
+            const curveStartZ = curZ - padLen + 30;
             _buildCurvedSection(
               scene, world,
               0, curveStartZ,
               cs.radius, cs.angle,
-              cs.width, cs.height ?? 18,
+              cs.width, cs.height ?? 20,
               curY, pal
             );
           }
@@ -157,7 +162,7 @@ export const MapFactory = {
 
       // ── Kill zone below this section ──────────────────────────────────
       world.addKillZone(
-        Vec3.create(-4000, endY - 200, startZ),
+        Vec3.create(-4000, endY - 250, startZ),
         Vec3.create( 4000, endY - 40, curZ),
       );
     }
@@ -168,31 +173,30 @@ export const MapFactory = {
     scene.add(finishGate);
 
     // ── Finish pad ────────────────────────────────────────────────────────
-    const finPad = padLens[sections.length] ?? 400;
+    const finPad = padLens[sections.length] ?? 500;
     _buildPad(scene, world, 0, curY - 10, curZ + finPad / 2, 800, 20, finPad, pal, TAG);
 
-    // ── Global kill band (below the lowest platform) ───────────────────
+    // ── Global kill bands ──────────────────────────────────────────────
     world.addKillZone(
-      Vec3.create(-4000, curY - 400, -500),
+      Vec3.create(-4000, curY - 450, -500),
       Vec3.create( 4000, curY - 60,  curZ + finPad),
     );
-    // OOB left/right
-    world.addKillZone(Vec3.create(-4000, -5000, -500), Vec3.create(-600, 1000, curZ + 500));
-    world.addKillZone(Vec3.create( 600,  -5000, -500), Vec3.create(4000, 1000, curZ + 500));
+    world.addKillZone(Vec3.create(-4000, -5000, -500), Vec3.create(-650, 1000, curZ + 500));
+    world.addKillZone(Vec3.create( 650,  -5000, -500), Vec3.create(4000, 1000, curZ + 500));
 
     // ── Background grid ────────────────────────────────────────────────
-    const grid = new THREE.GridHelper(20000, 200, 0x111122, 0x0d0d18);
-    grid.position.y = curY - 80;
+    const grid = new THREE.GridHelper(40000, 300, 0x111122, 0x0d0d18);
+    grid.position.y = curY - 100;
     grid.userData[TAG] = true;
     scene.add(grid);
 
-    // ── Build section HUD labels ───────────────────────────────────────
+    // ── Section HUD labels ─────────────────────────────────────────────
     const sectionZBounds = [];
-    sectionZBounds.push({ label: 'SPAWN', maxZ: padLens[0] ?? 300, color: '#445' });
-    let padZ = padLens[0] ?? 300;
+    sectionZBounds.push({ label: 'SPAWN', maxZ: padLens[0] ?? 400, color: '#445' });
+    let padZ = padLens[0] ?? 400;
     sectionBounds.forEach((s, i) => {
-      sectionZBounds.push({ label: `S${i+1}`, maxZ: s.endZ, color: ['#3366cc','#00cc88','#aa44ff','#ff8800'][i] ?? '#888' });
-      padZ = s.endZ + (padLens[i+1] ?? 220);
+      sectionZBounds.push({ label: `S${i+1}`, maxZ: s.endZ, color: ['#3366cc','#00cc88','#aa44ff','#ff8800','#ff0088','#ffcc00','#00ffcc','#ff4400','#44ffaa'][i] ?? '#888' });
+      padZ = s.endZ + (padLens[i+1] ?? 240);
       sectionZBounds.push({ label: `PAD${i+1}`, maxZ: padZ, color: '#445' });
     });
     sectionZBounds.push({ label: 'FINISH', maxZ: Infinity, color: '#ffcc00' });
@@ -203,11 +207,11 @@ export const MapFactory = {
       difficulty: def.difficulty,
       knifeId:    def.knifeId,
 
-      FINISH_Z:   curZ,
-      FINISH_Y:   curY,
-      SPAWN_Z:    0,
-      SPAWN_Y:    spawnY,
-      WORLD_MIN_Y: curY - 800,
+      FINISH_Z:    curZ,
+      FINISH_Y:    curY,
+      SPAWN_Z:     0,
+      SPAWN_Y:     spawnY,
+      WORLD_MIN_Y: curY - 1000,
 
       sectionBounds,
       sectionZBounds,
@@ -218,63 +222,183 @@ export const MapFactory = {
   },
 };
 
-// ── Curved section builder ────────────────────────────────────────────────────
+// ── Dynamic Skybox ────────────────────────────────────────────────────────────
 /**
- * _buildCurvedSection — Adds 8 short angled ramp box segments arranged in an arc,
- * approximating a smooth S-turn or U-turn.
- *
- * @param {THREE.Scene}   scene
- * @param {CollisionWorld} collisionBoxes  — collision world to register floors into
- * @param {number} x       — center X of the arc
- * @param {number} z       — start Z of the arc
- * @param {number} radius  — arc radius (controls how wide the curve is)
- * @param {number} angle   — total arc sweep in radians (positive = right turn, negative = left)
- * @param {number} width   — width of each segment box
- * @param {number} height  — height (vertical thickness) of each segment box
- * @param {number} y       — base Y of the section
- * @param {object} pal     — palette object from getPalette()
- * @returns {{ endX, endZ }}  — XZ position after the curve
+ * Build an animated skybox using a large sphere with vertex-colored gradient,
+ * plus particle stars for dark maps and atmospheric effects.
  */
-function _buildCurvedSection(scene, collisionBoxes, x, z, radius, angle, width, height, y, pal) {
-  const SEGMENTS  = 8;
-  const arcStep   = angle / SEGMENTS;
-  const segLen    = Math.abs(radius * arcStep);  // arc length per segment
+function _buildSkybox(scene, pal, amb, difficulty, tag) {
+  // Remove any existing skybox
+  const existing = [];
+  scene.traverse(o => { if (o.userData.skybox) existing.push(o); });
+  existing.forEach(o => scene.remove(o));
 
-  let curAngle = 0;  // accumulated angle along the arc (starts pointing in +Z direction)
-  let cx = x;
-  let cz = z;
+  const skyColor   = new THREE.Color(pal.sky);
+  const horizColor = new THREE.Color(pal.fog);
 
-  for (let i = 0; i < SEGMENTS; i++) {
-    const midAngle = curAngle + arcStep * 0.5;
-    const cosA = Math.cos(midAngle);
-    const sinA = Math.sin(midAngle);
+  // Sky dome — large sphere with gradient shading
+  const domeGeo = new THREE.SphereGeometry(15000, 32, 16);
+  const posAttr = domeGeo.attributes.position;
+  const colors  = new Float32Array(posAttr.count * 3);
 
-    // Segment center position
-    const segCx = cx + sinA * segLen * 0.5;
-    const segCz = cz + cosA * segLen * 0.5;
-
-    // Build box for this segment (rotated by midAngle)
-    const geo  = new THREE.BoxGeometry(width, height, segLen + 2);
-    const mesh = new THREE.Mesh(geo, makeMat(pal.ramp ?? 0x112233));
-    mesh.position.set(segCx, y - height / 2, segCz);
-    mesh.rotation.y = -midAngle;  // negate so the box faces along the travel direction
-    mesh.userData[TAG] = true;
-    mesh.add(new THREE.LineSegments(
-      new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({ color: pal.edge ?? 0x00cfff, opacity: 0.6, transparent: true })
-    ));
-    scene.add(mesh);
-
-    // Register as a physics floor (axis-aligned approximation per segment)
-    collisionBoxes.addFloor(segCx, segCz, width, segLen + 2, y);
-
-    // Advance to the end of this segment
-    curAngle += arcStep;
-    cx += Math.sin(curAngle) * segLen;
-    cz += Math.cos(curAngle) * segLen;
+  for (let i = 0; i < posAttr.count; i++) {
+    const y = posAttr.getY(i);
+    // Normalize height: -1 (bottom) to +1 (top) relative to sphere
+    const t = Math.max(0, Math.min(1, (y / 15000 + 1) * 0.5));
+    const c = new THREE.Color().lerpColors(horizColor, skyColor, t * t);
+    colors[i * 3]     = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
   }
 
-  return { endX: cx, endZ: cz };
+  domeGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const domeMat = new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    side: THREE.BackSide,
+    depthWrite: false,
+  });
+  const dome = new THREE.Mesh(domeGeo, domeMat);
+  dome.userData[tag] = true;
+  dome.userData.skybox = true;
+  dome.renderOrder = -1;
+  scene.add(dome);
+
+  // ── Star field (for dark maps only) ────────────────────────────────────
+  const skyBrightness = skyColor.r + skyColor.g + skyColor.b;
+  if (skyBrightness < 0.25) {
+    const starCount = difficulty === 'expert' ? 3000 : difficulty === 'advanced' ? 2000 : 1200;
+    _buildStars(scene, starCount, pal.edge, tag);
+  }
+
+  // ── Glowing horizon line ────────────────────────────────────────────────
+  const ringGeo = new THREE.TorusGeometry(12000, 40, 4, 80);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(pal.edge),
+    transparent: true,
+    opacity: 0.08,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.userData[tag] = true;
+  ring.userData.skybox = true;
+  ring.renderOrder = -1;
+  scene.add(ring);
+}
+
+function _buildStars(scene, count, edgeColor, tag) {
+  const starVerts = new Float32Array(count * 3);
+  const r = 12000;
+
+  for (let i = 0; i < count; i++) {
+    // Random point on sphere surface
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.sin(phi) * Math.sin(theta);
+    const z = r * Math.cos(phi);
+    starVerts[i * 3]     = x;
+    starVerts[i * 3 + 1] = Math.abs(y) * 0.8 + 500; // mostly upper hemisphere
+    starVerts[i * 3 + 2] = z;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(starVerts, 3));
+  const mat = new THREE.PointsMaterial({
+    color: new THREE.Color(edgeColor).lerp(new THREE.Color(0xffffff), 0.7),
+    size: 12,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.85,
+  });
+  const stars = new THREE.Points(geo, mat);
+  stars.userData[tag] = true;
+  stars.userData.skybox = true;
+  stars.renderOrder = -1;
+  scene.add(stars);
+}
+
+// ── Curved section builder ────────────────────────────────────────────────────
+/**
+ * Builds a curved banked connector between ramp sections.
+ * Creates proper surfable V-ramp segments arranged in an arc, with correct
+ * physics normals so players can surf each segment.
+ *
+ * Each segment is a mini-ramp section rotated to follow the arc direction.
+ * The ramp V-shape is computed in a local coordinate system and then rotated
+ * into world space.
+ */
+function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, height, y, pal) {
+  const SEGS = 10;
+  const arcStep = totalAngle / SEGS;
+  // Arc length per segment
+  const segLen  = Math.abs(radius * arcStep) + 20;
+  const outerX  = rampWidth / 2 + 50;
+  // Each curved segment has a small Y drop to maintain momentum
+  const dropPerSeg = outerX * 0.22;  // gentle bank slope
+
+  let facingAngle = 0;
+  let cx = x;
+  let cz = z;
+  let cy = y;
+
+  for (let i = 0; i < SEGS; i++) {
+    const nextAngle = facingAngle + arcStep;
+    const midAngle  = facingAngle + arcStep * 0.5;
+
+    // Local forward and right axes
+    const fwdX  =  Math.sin(midAngle);
+    const fwdZ  =  Math.cos(midAngle);
+    const rightX =  Math.cos(midAngle);
+    const rightZ = -Math.sin(midAngle);
+
+    const sy = cy;
+    const ey = cy - dropPerSeg;
+
+    // ── Left ramp quad in world space ────────────────────────────────────
+    // Outer edge stays at sy, inner edge drops to ey (like normal ramp)
+    const lv0 = Vec3.create(cx - rightX * outerX, sy, cz - rightZ * outerX);
+    const lv1 = Vec3.create(cx,                   ey, cz                   );
+    const lv2 = Vec3.create(cx + fwdX * segLen,   ey, cz + fwdZ * segLen  );
+    const lv3 = Vec3.create(cx + fwdX * segLen - rightX * outerX,  sy,
+                            cz + fwdZ * segLen - rightZ * outerX);
+
+    // Normal: points away from ramp surface (upward-outward)
+    const lNorm = Vec3.normalize(Vec3.create(
+       dropPerSeg * rightX + dropPerSeg * 0.1,
+       outerX,
+       dropPerSeg * rightZ + dropPerSeg * 0.1,
+    ));
+    world.addQuadWithNormal(lv0, lv1, lv2, lv3, lNorm);
+    _addRampMesh(scene, [lv0, lv1, lv2, lv3], pal.ramp, pal.edge, TAG);
+
+    // ── Right ramp quad ─────────────────────────────────────────────────
+    const rv0 = Vec3.create(cx + rightX * outerX, sy, cz + rightZ * outerX);
+    const rv1 = Vec3.create(cx,                   ey, cz                   );
+    const rv2 = Vec3.create(cx + fwdX * segLen,   ey, cz + fwdZ * segLen  );
+    const rv3 = Vec3.create(cx + fwdX * segLen + rightX * outerX, sy,
+                            cz + fwdZ * segLen + rightZ * outerX);
+
+    const rNorm = Vec3.normalize(Vec3.create(
+      -dropPerSeg * rightX - dropPerSeg * 0.1,
+       outerX,
+      -dropPerSeg * rightZ - dropPerSeg * 0.1,
+    ));
+    world.addQuadWithNormal(rv0, rv1, rv2, rv3, rNorm);
+    _addRampMesh(scene, [rv0, rv1, rv2, rv3], pal.ramp, pal.edge, TAG);
+
+    // ── Floor of the arc segment ─────────────────────────────────────────
+    world.addFloor(
+      cx + fwdX * segLen * 0.5,
+      cz + fwdZ * segLen * 0.5,
+      rampWidth, segLen, ey
+    );
+
+    // Advance arc
+    facingAngle += arcStep;
+    cx += fwdX * segLen;
+    cz += fwdZ * segLen;
+    cy  = ey;
+  }
 }
 
 // ── Visual helpers ────────────────────────────────────────────────────────────

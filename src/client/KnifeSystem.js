@@ -118,6 +118,7 @@ export class KnifeSystem {
     this._mesh = this._buildType(this._equippedType, skin);
     this._mesh.position.copy(BASE_POS);
     this._mesh.rotation.set(0.10, Math.PI * 0.15, 0.05);
+    this._mesh.scale.set(0.48, 0.48, 0.48);
     this.camera.add(this._mesh);
     if (!this.scene.getObjectById(this.camera.id)) this.scene.add(this.camera);
   }
