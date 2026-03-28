@@ -1,0 +1,125 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "surf-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "3000"],
+      "port": 3000
+    },
+    {
+      "name": "deploy-helper",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\deploy-helper.mjs"],
+      "port": 3001
+    },
+    {
+      "name": "build-helper",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\build-helper.mjs"],
+      "port": 3005
+    },
+    {
+      "name": "git-push",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\git-push.mjs"],
+      "port": 3006
+    },
+    {
+      "name": "npm-install",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\npm-install.mjs"],
+      "port": 3007
+    },
+    {
+      "name": "npm-install2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\npm-install2.mjs"],
+      "port": 3008
+    },
+    {
+      "name": "build2",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\build2.mjs"],
+      "port": 3009
+    },
+    {
+      "name": "railway-install",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "npm install -g @railway/cli"],
+      "port": 3002
+    },
+    {
+      "name": "railway-login",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "cd E:\\SurfGame; railway login"],
+      "port": 3003
+    },
+    {
+      "name": "railway-deploy",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-Command", "cd E:\\SurfGame; railway up --detach"],
+      "port": 3004
+    },
+    {
+      "name": "launcher-repo-init",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGameLauncher\\launcher-repo-init.mjs"],
+      "port": 3010
+    },
+    {
+      "name": "launcher-npm-install",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGameLauncher\\launcher-npm-install.mjs"],
+      "port": 3011
+    },
+    {
+      "name": "launcher-build",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGameLauncher\\launcher-build.mjs"],
+      "port": 3012
+    },
+    {
+      "name": "launcher-release",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGameLauncher\\launcher-release.mjs"],
+      "port": 3013
+    },
+    {
+      "name": "railway-up",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\railway-up.mjs"],
+      "port": 3014
+    },
+    {
+      "name": "railway-link",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\railway-link.mjs"],
+      "port": 3015
+    },
+    {
+      "name": "railway-find-config",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\railway-find-config.mjs"],
+      "port": 3016
+    },
+    {
+      "name": "railway-api-link",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\railway-api-link.mjs"],
+      "port": 3017
+    },
+    {
+      "name": "railway-trigger-deploy",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\railway-trigger-deploy.mjs"],
+      "port": 3018
+    },
+    {
+      "name": "build-exe-push",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["E:\\SurfGame\\build-exe-push.mjs"],
+      "port": 3019
+    }
+  ]
+}

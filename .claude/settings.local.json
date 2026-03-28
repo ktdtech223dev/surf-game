@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm install\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm run:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm run build 2>&1\")",
+      "Bash(powershell -Command \"cd E:\\\\SurfGame; npm run build\")",
+      "Bash(cmd /c \"cd /d E:\\\\SurfGame && npm run build\")",
+      "Bash(powershell -Command \"Set-Location E:\\\\SurfGame; npm run build\")",
+      "Bash(start powershell:*)",
+      "Bash(powershell.exe -NonInteractive -File \"E:\\\\SurfGame\\\\deploy.ps1\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"E:\\\\SurfGame\\\\deploy.ps1\")",
+      "Bash(curl -s http://localhost:3019/)"
+    ]
+  }
+}

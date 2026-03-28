@@ -1,0 +1,61 @@
+{
+  "name": "cuunsurf",
+  "version": "1.0.0",
+  "description": "CuunSurf — 3D multiplayer surf game · N Games Network",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node --experimental-sqlite src/server/server.js",
+    "electron:dev": "npm run build && electron .",
+    "electron:build": "npm run build && electron-builder --win portable"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "three": "^0.170.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "vite": "^6.0.0"
+  },
+  "build": {
+    "appId": "com.ngames.cuunsurf",
+    "productName": "CuunSurf",
+    "copyright": "N Games Network",
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "public/ngames.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist",
+        "to": "dist"
+      }
+    ],
+    "directories": {
+      "output": "release-build"
+    },
+    "artifactName": "CuunSurf-${version}-portable.exe",
+    "asar": true
+  }
+}

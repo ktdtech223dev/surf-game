@@ -1,0 +1,523 @@
+/**
+ * MapCatalog.js — All 32 fixed surf maps + procedural daily/weekly
+ * Each map descriptor includes: id, name, difficulty, knifeId, paletteKey,
+ * sections (array of ramp section descriptors), FINISH_Z, FINISH_Y, etc.
+ *
+ * Sections are built by MapBuilder.buildMap(mapId, scene).
+ */
+
+export const DIFFICULTY = { BEGINNER: 'beginner', INTERMEDIATE: 'intermediate', ADVANCED: 'advanced', EXPERT: 'expert' };
+
+/** All 32 fixed maps */
+export const MAP_CATALOG = [
+  // ── Beginner (map01–08) ───────────────────────────────────────────────────
+  {
+    id: 'map_01', name: 'Shoreline',  difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_shoreline', paletteKey: 'shoreline',
+    desc: 'A gentle coastal surf with wide ramps and forgiving transitions.',
+    sections: [
+      { w: 320, depth: 900, angle: 0.32, dropY: -290 },
+      { w: 300, depth: 800, angle: 0.30, dropY: -240 },
+      { w: 290, depth: 780, angle: 0.33, dropY: -257 },
+      { w: 280, depth: 760, angle: 0.35, dropY: -266 },
+    ],
+    padLens: [300, 210, 300, 210, 350], spawnY: 0,
+    // Curved connector: gentle S-turn between the two ramp sections
+    curvedSections: [
+      { afterPad: 0, radius: 400, angle:  0.55, width: 280, height: 18 },
+      { afterPad: 1, radius: 350, angle: -0.45, width: 260, height: 18 },
+    ],
+  },
+  {
+    id: 'map_02', name: 'Coastal',    difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_coastal', paletteKey: 'coastal',
+    desc: 'Rolling green ramps along a calm shore.',
+    sections: [
+      { w: 300, depth: 850, angle: 0.30, dropY: -255 },
+      { w: 280, depth: 900, angle: 0.28, dropY: -252 },
+      { w: 270, depth: 870, angle: 0.31, dropY: -270 },
+      { w: 260, depth: 840, angle: 0.33, dropY: -277 },
+    ],
+    padLens: [280, 210, 280, 210, 320], spawnY: 0,
+  },
+  {
+    id: 'map_03', name: 'Basin',      difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_basin', paletteKey: 'basin',
+    desc: 'A volcanic basin with red-hot ramps.',
+    sections: [
+      { w: 340, depth: 950, angle: 0.33, dropY: -313 },
+      { w: 320, depth: 850, angle: 0.31, dropY: -263 },
+      { w: 310, depth: 830, angle: 0.34, dropY: -282 },
+      { w: 300, depth: 810, angle: 0.36, dropY: -292 },
+    ],
+    padLens: [300, 210, 280, 210, 340], spawnY: 0,
+  },
+  {
+    id: 'map_04', name: 'Inlet',      difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_inlet', paletteKey: 'inlet',
+    desc: 'Amber ramps through a narrow inlet.',
+    sections: [
+      { w: 290, depth: 800, angle: 0.30, dropY: -240 },
+      { w: 270, depth: 850, angle: 0.28, dropY: -238 },
+      { w: 260, depth: 820, angle: 0.31, dropY: -254 },
+      { w: 250, depth: 800, angle: 0.33, dropY: -264 },
+    ],
+    padLens: [260, 205, 260, 205, 300], spawnY: 0,
+  },
+  {
+    id: 'map_05', name: 'Cove',       difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_cove', paletteKey: 'cove',
+    desc: 'Purple twilight in a hidden cove.',
+    sections: [
+      { w: 310, depth: 880, angle: 0.31, dropY: -272 },
+      { w: 300, depth: 820, angle: 0.30, dropY: -246 },
+      { w: 290, depth: 800, angle: 0.33, dropY: -264 },
+      { w: 280, depth: 780, angle: 0.35, dropY: -273 },
+    ],
+    padLens: [280, 210, 280, 210, 320], spawnY: 0,
+  },
+  {
+    id: 'map_06', name: 'Bay',        difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_bay', paletteKey: 'bay',
+    desc: 'Teal waves in an open bay.',
+    sections: [
+      { w: 330, depth: 920, angle: 0.32, dropY: -294 },
+      { w: 310, depth: 860, angle: 0.30, dropY: -258 },
+      { w: 300, depth: 840, angle: 0.33, dropY: -277 },
+      { w: 290, depth: 820, angle: 0.35, dropY: -287 },
+    ],
+    padLens: [300, 210, 290, 210, 330], spawnY: 0,
+  },
+  {
+    id: 'map_07', name: 'Delta',      difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_delta', paletteKey: 'delta',
+    desc: 'Yellow-green ramps at a river delta.',
+    sections: [
+      { w: 280, depth: 780, angle: 0.29, dropY: -226 },
+      { w: 270, depth: 800, angle: 0.28, dropY: -224 },
+      { w: 260, depth: 770, angle: 0.31, dropY: -239 },
+      { w: 250, depth: 750, angle: 0.33, dropY: -247 },
+    ],
+    padLens: [260, 205, 260, 205, 300], spawnY: 0,
+  },
+  {
+    id: 'map_08', name: 'Lagoon',     difficulty: DIFFICULTY.BEGINNER,
+    knifeId: 'knife_lagoon', paletteKey: 'lagoon',
+    desc: 'Crystal blue ramps in a tropical lagoon.',
+    sections: [
+      { w: 300, depth: 830, angle: 0.31, dropY: -256 },
+      { w: 290, depth: 800, angle: 0.29, dropY: -232 },
+      { w: 280, depth: 780, angle: 0.32, dropY: -250 },
+      { w: 270, depth: 760, angle: 0.34, dropY: -258 },
+    ],
+    padLens: [280, 208, 270, 208, 310], spawnY: 0,
+  },
+
+  // ── Intermediate (map09–16) ───────────────────────────────────────────────
+  {
+    id: 'map_09', name: 'Gorge',      difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_gorge', paletteKey: 'gorge',
+    desc: 'Tight orange corridors through a deep gorge.',
+    sections: [
+      { w: 260, depth: 950, angle: 0.38, dropY: -358 },
+      { w: 240, depth: 900, angle: 0.40, dropY: -360 },
+      { w: 250, depth: 850, angle: 0.38, dropY: -323 },
+      { w: 240, depth: 820, angle: 0.41, dropY: -336 },
+      { w: 230, depth: 790, angle: 0.43, dropY: -340 },
+      { w: 220, depth: 760, angle: 0.45, dropY: -342 },
+    ],
+    padLens: [220, 210, 220, 210, 220, 210, 280], spawnY: 0,
+    // Curved U-turn after first pad and sharp S after second
+    curvedSections: [
+      { afterPad: 0, radius: 280, angle:  0.70, width: 220, height: 18 },
+      { afterPad: 1, radius: 260, angle: -0.65, width: 210, height: 18 },
+      { afterPad: 2, radius: 240, angle:  0.60, width: 200, height: 18 },
+    ],
+  },
+  {
+    id: 'map_10', name: 'Canyon',     difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_canyon', paletteKey: 'canyon',
+    desc: 'Rocky orange walls flanking a deep canyon.',
+    sections: [
+      { w: 270, depth: 980, angle: 0.39, dropY: -380 },
+      { w: 255, depth: 920, angle: 0.38, dropY: -350 },
+      { w: 260, depth: 880, angle: 0.40, dropY: -352 },
+      { w: 250, depth: 850, angle: 0.41, dropY: -349 },
+      { w: 240, depth: 820, angle: 0.43, dropY: -353 },
+      { w: 230, depth: 790, angle: 0.45, dropY: -356 },
+    ],
+    padLens: [230, 212, 230, 212, 220, 212, 290], spawnY: 0,
+  },
+  {
+    id: 'map_11', name: 'Ravine',     difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_ravine', paletteKey: 'ravine',
+    desc: 'Lime-green ramps through a narrow ravine.',
+    sections: [
+      { w: 250, depth: 960, angle: 0.40, dropY: -384 },
+      { w: 240, depth: 910, angle: 0.41, dropY: -373 },
+      { w: 245, depth: 870, angle: 0.39, dropY: -339 },
+      { w: 235, depth: 840, angle: 0.42, dropY: -353 },
+      { w: 225, depth: 810, angle: 0.44, dropY: -357 },
+      { w: 215, depth: 780, angle: 0.46, dropY: -359 },
+    ],
+    padLens: [220, 210, 210, 210, 220, 210, 280], spawnY: 0,
+  },
+  {
+    id: 'map_12', name: 'Chasm',      difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_chasm', paletteKey: 'chasm',
+    desc: 'Blue ramps plunging into a bottomless chasm.',
+    sections: [
+      { w: 265, depth: 970, angle: 0.39, dropY: -377 },
+      { w: 250, depth: 930, angle: 0.40, dropY: -372 },
+      { w: 255, depth: 890, angle: 0.41, dropY: -365 },
+      { w: 245, depth: 860, angle: 0.42, dropY: -361 },
+      { w: 235, depth: 830, angle: 0.44, dropY: -365 },
+      { w: 225, depth: 800, angle: 0.46, dropY: -368 },
+    ],
+    padLens: [225, 212, 215, 212, 225, 212, 285], spawnY: 0,
+  },
+  {
+    id: 'map_13', name: 'Abyss',      difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_abyss', paletteKey: 'abyss',
+    desc: 'Dark as night, pink edges in infinite black.',
+    sections: [
+      { w: 255, depth: 990, angle: 0.41, dropY: -406 },
+      { w: 240, depth: 940, angle: 0.42, dropY: -395 },
+      { w: 250, depth: 900, angle: 0.40, dropY: -360 },
+      { w: 240, depth: 870, angle: 0.43, dropY: -374 },
+      { w: 230, depth: 840, angle: 0.45, dropY: -378 },
+      { w: 220, depth: 810, angle: 0.47, dropY: -381 },
+    ],
+    padLens: [220, 210, 210, 210, 215, 210, 275], spawnY: 0,
+  },
+  {
+    id: 'map_14', name: 'Ridge',      difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_ridge', paletteKey: 'ridge',
+    desc: 'Lavender ramps along a high mountain ridge.',
+    sections: [
+      { w: 260, depth: 960, angle: 0.38, dropY: -364 },
+      { w: 245, depth: 920, angle: 0.39, dropY: -358 },
+      { w: 250, depth: 880, angle: 0.38, dropY: -334 },
+      { w: 240, depth: 850, angle: 0.41, dropY: -349 },
+      { w: 230, depth: 820, angle: 0.43, dropY: -353 },
+      { w: 220, depth: 790, angle: 0.45, dropY: -356 },
+    ],
+    padLens: [225, 212, 215, 212, 220, 212, 280], spawnY: 0,
+  },
+  {
+    id: 'map_15', name: 'Summit',     difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_summit', paletteKey: 'summit',
+    desc: 'White ramps in a blizzard at the mountain top.',
+    sections: [
+      { w: 250, depth: 940, angle: 0.40, dropY: -376 },
+      { w: 240, depth: 900, angle: 0.41, dropY: -369 },
+      { w: 245, depth: 860, angle: 0.40, dropY: -344 },
+      { w: 235, depth: 830, angle: 0.43, dropY: -357 },
+      { w: 225, depth: 800, angle: 0.45, dropY: -360 },
+      { w: 215, depth: 770, angle: 0.47, dropY: -362 },
+    ],
+    padLens: [220, 210, 210, 210, 215, 210, 275], spawnY: 0,
+  },
+  {
+    id: 'map_16', name: 'Peak',       difficulty: DIFFICULTY.INTERMEDIATE,
+    knifeId: 'knife_peak', paletteKey: 'peak',
+    desc: 'Cyan ramps at the icy summit.',
+    sections: [
+      { w: 255, depth: 950, angle: 0.39, dropY: -371 },
+      { w: 245, depth: 910, angle: 0.40, dropY: -364 },
+      { w: 250, depth: 870, angle: 0.39, dropY: -339 },
+      { w: 240, depth: 840, angle: 0.42, dropY: -353 },
+      { w: 230, depth: 810, angle: 0.44, dropY: -357 },
+      { w: 220, depth: 780, angle: 0.46, dropY: -359 },
+    ],
+    padLens: [222, 210, 212, 210, 218, 210, 278], spawnY: 0,
+  },
+
+  // ── Advanced (map17–24) ────────────────────────────────────────────────────
+  {
+    id: 'map_17', name: 'Storm',      difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_storm', paletteKey: 'storm',
+    desc: 'Yellow lightning ramps through a violent storm.',
+    sections: [
+      { w: 220, depth: 1050, angle: 0.46, dropY: -482 },
+      { w: 210, depth: 980,  angle: 0.47, dropY: -460 },
+      { w: 215, depth: 950,  angle: 0.46, dropY: -437 },
+      { w: 205, depth: 900,  angle: 0.48, dropY: -433 },
+      { w: 195, depth: 870,  angle: 0.50, dropY: -435 },
+      { w: 185, depth: 840,  angle: 0.52, dropY: -437 },
+      { w: 175, depth: 810,  angle: 0.54, dropY: -437 },
+    ],
+    padLens: [190, 195, 190, 195, 190, 195, 190, 250], spawnY: 0,
+    // Aggressive curved transitions — tight S-turns between each section
+    curvedSections: [
+      { afterPad: 0, radius: 220, angle:  0.80, width: 190, height: 18 },
+      { afterPad: 1, radius: 210, angle: -0.75, width: 185, height: 18 },
+      { afterPad: 2, radius: 205, angle:  0.78, width: 182, height: 18 },
+      { afterPad: 3, radius: 200, angle: -0.72, width: 178, height: 18 },
+    ],
+  },
+  {
+    id: 'map_18', name: 'Tempest',    difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_tempest', paletteKey: 'tempest',
+    desc: 'Blue ramps in a raging ocean tempest.',
+    sections: [
+      { w: 215, depth: 1060, angle: 0.46, dropY: -487 },
+      { w: 205, depth: 990,  angle: 0.47, dropY: -465 },
+      { w: 210, depth: 960,  angle: 0.47, dropY: -451 },
+      { w: 200, depth: 910,  angle: 0.48, dropY: -437 },
+      { w: 190, depth: 880,  angle: 0.50, dropY: -440 },
+      { w: 180, depth: 850,  angle: 0.52, dropY: -442 },
+      { w: 170, depth: 820,  angle: 0.54, dropY: -443 },
+    ],
+    padLens: [188, 193, 188, 193, 188, 193, 188, 248], spawnY: 0,
+  },
+  {
+    id: 'map_19', name: 'Gale',       difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_gale', paletteKey: 'gale',
+    desc: 'Red-pink ramps in a scorching desert gale.',
+    sections: [
+      { w: 218, depth: 1070, angle: 0.47, dropY: -501 },
+      { w: 208, depth: 1000, angle: 0.48, dropY: -480 },
+      { w: 213, depth: 970,  angle: 0.47, dropY: -455 },
+      { w: 203, depth: 920,  angle: 0.49, dropY: -451 },
+      { w: 193, depth: 890,  angle: 0.51, dropY: -454 },
+      { w: 183, depth: 860,  angle: 0.53, dropY: -456 },
+      { w: 173, depth: 830,  angle: 0.55, dropY: -456 },
+    ],
+    padLens: [186, 192, 186, 192, 186, 192, 186, 246], spawnY: 0,
+  },
+  {
+    id: 'map_20', name: 'Squall',     difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_squall', paletteKey: 'squall',
+    desc: 'Green ramps in a tropical squall.',
+    sections: [
+      { w: 210, depth: 1040, angle: 0.45, dropY: -464 },
+      { w: 200, depth: 975,  angle: 0.46, dropY: -446 },
+      { w: 205, depth: 945,  angle: 0.46, dropY: -435 },
+      { w: 195, depth: 895,  angle: 0.47, dropY: -423 },
+      { w: 185, depth: 865,  angle: 0.49, dropY: -424 },
+      { w: 175, depth: 835,  angle: 0.51, dropY: -426 },
+      { w: 165, depth: 805,  angle: 0.53, dropY: -427 },
+    ],
+    padLens: [184, 190, 184, 190, 184, 190, 184, 244], spawnY: 0,
+  },
+  {
+    id: 'map_21', name: 'Cyclone',    difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_cyclone', paletteKey: 'cyclone',
+    desc: 'Purple vortex ramps in a spinning cyclone.',
+    sections: [
+      { w: 212, depth: 1080, angle: 0.47, dropY: -507 },
+      { w: 202, depth: 1010, angle: 0.48, dropY: -485 },
+      { w: 207, depth: 980,  angle: 0.47, dropY: -460 },
+      { w: 197, depth: 930,  angle: 0.49, dropY: -456 },
+      { w: 187, depth: 900,  angle: 0.51, dropY: -459 },
+      { w: 177, depth: 870,  angle: 0.53, dropY: -461 },
+      { w: 167, depth: 840,  angle: 0.55, dropY: -462 },
+    ],
+    padLens: [182, 190, 182, 190, 182, 190, 182, 242], spawnY: 0,
+  },
+  {
+    id: 'map_22', name: 'Vortex',     difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_vortex', paletteKey: 'vortex',
+    desc: 'Orange spiral ramps through a vortex.',
+    sections: [
+      { w: 208, depth: 1055, angle: 0.46, dropY: -484 },
+      { w: 198, depth: 985,  angle: 0.47, dropY: -462 },
+      { w: 203, depth: 955,  angle: 0.47, dropY: -448 },
+      { w: 193, depth: 905,  angle: 0.48, dropY: -434 },
+      { w: 183, depth: 875,  angle: 0.50, dropY: -438 },
+      { w: 173, depth: 845,  angle: 0.52, dropY: -440 },
+      { w: 163, depth: 815,  angle: 0.54, dropY: -440 },
+    ],
+    padLens: [180, 188, 180, 188, 180, 188, 180, 240], spawnY: 0,
+  },
+  {
+    id: 'map_23', name: 'Maelstrom',  difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_maelstrom', paletteKey: 'maelstrom',
+    desc: 'Deep blue ramps inside a crushing maelstrom.',
+    sections: [
+      { w: 205, depth: 1090, angle: 0.48, dropY: -523 },
+      { w: 195, depth: 1020, angle: 0.49, dropY: -500 },
+      { w: 200, depth: 990,  angle: 0.48, dropY: -474 },
+      { w: 190, depth: 940,  angle: 0.50, dropY: -470 },
+      { w: 180, depth: 910,  angle: 0.52, dropY: -473 },
+      { w: 170, depth: 880,  angle: 0.54, dropY: -475 },
+      { w: 160, depth: 850,  angle: 0.56, dropY: -476 },
+    ],
+    padLens: [178, 186, 178, 186, 178, 186, 178, 238], spawnY: 0,
+  },
+  {
+    id: 'map_24', name: 'Typhoon',    difficulty: DIFFICULTY.ADVANCED,
+    knifeId: 'knife_typhoon', paletteKey: 'typhoon',
+    desc: 'Pink-magenta ramps in a blinding typhoon.',
+    sections: [
+      { w: 202, depth: 1065, angle: 0.47, dropY: -498 },
+      { w: 192, depth: 995,  angle: 0.48, dropY: -476 },
+      { w: 197, depth: 965,  angle: 0.47, dropY: -453 },
+      { w: 187, depth: 915,  angle: 0.49, dropY: -448 },
+      { w: 177, depth: 885,  angle: 0.51, dropY: -451 },
+      { w: 167, depth: 855,  angle: 0.53, dropY: -453 },
+      { w: 157, depth: 825,  angle: 0.55, dropY: -453 },
+    ],
+    padLens: [176, 184, 176, 184, 176, 184, 176, 236], spawnY: 0,
+  },
+
+  // ── Expert (map25–32) ─────────────────────────────────────────────────────
+  {
+    id: 'map_25', name: 'Void',       difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_void', paletteKey: 'void',
+    desc: 'Red ramps suspended in absolute void.',
+    sections: [
+      { w: 175, depth: 1200, angle: 0.54, dropY: -648 },
+      { w: 165, depth: 1120, angle: 0.55, dropY: -616 },
+      { w: 170, depth: 1080, angle: 0.54, dropY: -583 },
+      { w: 160, depth: 1030, angle: 0.56, dropY: -577 },
+      { w: 150, depth: 1000, angle: 0.58, dropY: -580 },
+      { w: 140, depth: 970,  angle: 0.60, dropY: -582 },
+      { w: 132, depth: 940,  angle: 0.62, dropY: -583 },
+      { w: 124, depth: 910,  angle: 0.64, dropY: -583 },
+      { w: 116, depth: 880,  angle: 0.66, dropY: -581 },
+    ],
+    padLens: [160, 205, 160, 205, 160, 205, 160, 205, 160, 220], spawnY: 0,
+  },
+  {
+    id: 'map_26', name: 'Null',       difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_null', paletteKey: 'null',
+    desc: 'Teal edges barely visible in the darkness.',
+    sections: [
+      { w: 170, depth: 1220, angle: 0.55, dropY: -669 },
+      { w: 160, depth: 1140, angle: 0.56, dropY: -638 },
+      { w: 165, depth: 1100, angle: 0.55, dropY: -605 },
+      { w: 155, depth: 1050, angle: 0.57, dropY: -599 },
+      { w: 145, depth: 1020, angle: 0.59, dropY: -602 },
+      { w: 135, depth: 990,  angle: 0.61, dropY: -604 },
+      { w: 127, depth: 960,  angle: 0.63, dropY: -605 },
+      { w: 119, depth: 930,  angle: 0.65, dropY: -605 },
+      { w: 111, depth: 900,  angle: 0.67, dropY: -603 },
+    ],
+    padLens: [158, 203, 158, 203, 158, 203, 158, 203, 158, 218], spawnY: 0,
+  },
+  {
+    id: 'map_27', name: 'Zenith',     difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_zenith', paletteKey: 'zenith',
+    desc: 'Lavender at the highest point of existence.',
+    sections: [
+      { w: 168, depth: 1230, angle: 0.55, dropY: -675 },
+      { w: 158, depth: 1150, angle: 0.56, dropY: -644 },
+      { w: 163, depth: 1110, angle: 0.55, dropY: -611 },
+      { w: 153, depth: 1060, angle: 0.57, dropY: -605 },
+      { w: 143, depth: 1030, angle: 0.59, dropY: -608 },
+      { w: 133, depth: 1000, angle: 0.61, dropY: -610 },
+      { w: 125, depth: 970,  angle: 0.63, dropY: -611 },
+      { w: 117, depth: 940,  angle: 0.65, dropY: -611 },
+      { w: 109, depth: 910,  angle: 0.67, dropY: -609 },
+    ],
+    padLens: [156, 202, 156, 202, 156, 202, 156, 202, 156, 216], spawnY: 0,
+  },
+  {
+    id: 'map_28', name: 'Apex',       difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_apex', paletteKey: 'apex',
+    desc: 'Orange-red ramps at the apex of difficulty.',
+    sections: [
+      { w: 165, depth: 1240, angle: 0.56, dropY: -694 },
+      { w: 155, depth: 1160, angle: 0.57, dropY: -661 },
+      { w: 160, depth: 1120, angle: 0.56, dropY: -627 },
+      { w: 150, depth: 1070, angle: 0.58, dropY: -622 },
+      { w: 140, depth: 1040, angle: 0.60, dropY: -624 },
+      { w: 130, depth: 1010, angle: 0.62, dropY: -626 },
+      { w: 122, depth: 980,  angle: 0.64, dropY: -627 },
+      { w: 114, depth: 950,  angle: 0.66, dropY: -627 },
+      { w: 106, depth: 920,  angle: 0.68, dropY: -626 },
+    ],
+    padLens: [154, 200, 154, 200, 154, 200, 154, 200, 154, 214], spawnY: 0,
+  },
+  {
+    id: 'map_29', name: 'Omega',      difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_omega', paletteKey: 'omega',
+    desc: 'Green ramps in the final stage.',
+    sections: [
+      { w: 162, depth: 1250, angle: 0.56, dropY: -700 },
+      { w: 152, depth: 1170, angle: 0.57, dropY: -667 },
+      { w: 157, depth: 1130, angle: 0.56, dropY: -633 },
+      { w: 147, depth: 1080, angle: 0.58, dropY: -627 },
+      { w: 137, depth: 1050, angle: 0.60, dropY: -630 },
+      { w: 127, depth: 1020, angle: 0.62, dropY: -632 },
+      { w: 119, depth: 990,  angle: 0.64, dropY: -634 },
+      { w: 111, depth: 960,  angle: 0.66, dropY: -634 },
+      { w: 103, depth: 930,  angle: 0.68, dropY: -632 },
+    ],
+    padLens: [152, 200, 152, 200, 152, 200, 152, 200, 152, 212], spawnY: 0,
+  },
+  {
+    id: 'map_30', name: 'Sigma',      difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_sigma', paletteKey: 'sigma',
+    desc: 'Magenta ramps for those who have transcended.',
+    sections: [
+      { w: 158, depth: 1260, angle: 0.57, dropY: -718 },
+      { w: 148, depth: 1180, angle: 0.58, dropY: -684 },
+      { w: 153, depth: 1140, angle: 0.57, dropY: -650 },
+      { w: 143, depth: 1090, angle: 0.59, dropY: -644 },
+      { w: 133, depth: 1060, angle: 0.61, dropY: -647 },
+      { w: 123, depth: 1030, angle: 0.63, dropY: -649 },
+      { w: 115, depth: 1000, angle: 0.65, dropY: -650 },
+      { w: 107, depth: 970,  angle: 0.67, dropY: -650 },
+      { w:  99, depth: 940,  angle: 0.69, dropY: -649 },
+    ],
+    padLens: [150, 200, 150, 200, 150, 200, 150, 200, 150, 210], spawnY: 0,
+  },
+  {
+    id: 'map_31', name: 'Prime',      difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_prime', paletteKey: 'prime',
+    desc: 'Blue ramps at the edge of the prime dimension.',
+    sections: [
+      { w: 155, depth: 1270, angle: 0.57, dropY: -724 },
+      { w: 145, depth: 1190, angle: 0.58, dropY: -690 },
+      { w: 150, depth: 1150, angle: 0.57, dropY: -656 },
+      { w: 140, depth: 1100, angle: 0.59, dropY: -650 },
+      { w: 130, depth: 1070, angle: 0.61, dropY: -653 },
+      { w: 120, depth: 1040, angle: 0.63, dropY: -655 },
+      { w: 112, depth: 1010, angle: 0.65, dropY: -657 },
+      { w: 104, depth: 980,  angle: 0.67, dropY: -657 },
+      { w:  96, depth: 950,  angle: 0.69, dropY: -656 },
+    ],
+    padLens: [148, 200, 148, 200, 148, 200, 148, 200, 148, 208], spawnY: 0,
+  },
+  {
+    id: 'map_32', name: 'Absolute',   difficulty: DIFFICULTY.EXPERT,
+    knifeId: 'knife_absolute', paletteKey: 'absolute',
+    desc: 'Gold ramps. The hardest map ever conceived.',
+    sections: [
+      { w: 150, depth: 1300, angle: 0.58, dropY: -754 },
+      { w: 140, depth: 1220, angle: 0.59, dropY: -719 },
+      { w: 145, depth: 1180, angle: 0.58, dropY: -684 },
+      { w: 135, depth: 1130, angle: 0.60, dropY: -678 },
+      { w: 125, depth: 1100, angle: 0.62, dropY: -682 },
+      { w: 115, depth: 1070, angle: 0.64, dropY: -685 },
+      { w: 107, depth: 1040, angle: 0.66, dropY: -686 },
+      { w:  99, depth: 1010, angle: 0.68, dropY: -687 },
+      { w:  91, depth: 980,  angle: 0.70, dropY: -686 },
+    ],
+    padLens: [145, 200, 145, 200, 145, 200, 145, 200, 145, 205], spawnY: 0,
+  },
+];
+
+/** Fast lookup by ID */
+export const MAP_BY_ID = Object.fromEntries(MAP_CATALOG.map(m => [m.id, m]));
+
+/** Maps grouped by difficulty */
+export const MAPS_BY_DIFF = {
+  [DIFFICULTY.BEGINNER]:     MAP_CATALOG.slice(0, 8),
+  [DIFFICULTY.INTERMEDIATE]: MAP_CATALOG.slice(8, 16),
+  [DIFFICULTY.ADVANCED]:     MAP_CATALOG.slice(16, 24),
+  [DIFFICULTY.EXPERT]:       MAP_CATALOG.slice(24, 32),
+};
+
+/** Knife unlock ID for a given map */
+export function knifeForMap(mapId) {
+  return MAP_BY_ID[mapId]?.knifeId ?? null;
+}
+
+/** Achievement key for completing all maps of a difficulty */
+export function diffAchievement(diff) {
+  return { beginner: 'beginner_all', intermediate: 'inter_all', advanced: 'advanced_all', expert: 'expert_all' }[diff] ?? null;
+}

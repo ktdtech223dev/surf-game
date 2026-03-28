@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CuunSurf</title>
+  <script src="/ngames.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    canvas { display: block; }
+
+    #ui-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      font-family: 'Consolas', 'Courier New', monospace;
+      z-index: 10;
+    }
+
+    /* ── Debug HUD ─────────────────────────────────────────── */
+    #debug-hud {
+      position: absolute;
+      top: 10px; left: 10px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #0f0;
+      text-shadow: 0 0 4px rgba(0,0,0,0.9);
+    }
+
+    /* ── Speed / tick graphs ───────────────────────────────── */
+    #speed-graph {
+      position: absolute;
+      bottom: 10px; left: 10px;
+    }
+    #tick-graph {
+      position: absolute;
+      bottom: 10px; right: 10px;
+    }
+
+    /* ── Crosshair (managed by CrosshairSystem canvas) ──────── */
+    #crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 300;
+    }
+
+    /* ── Hit marker (over crosshair) ───────────────────────── */
+    #hit-marker {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 22px; height: 22px;
+      border: 2px solid #00cfff;
+      border-radius: 50%;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 0 8px rgba(0,207,255,0.8);
+      transition: opacity 0.08s;
+    }
+
+    /* ── Click-to-start overlay ────────────────────────────── */
+    #instructions {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -60%);
+      color: #fff;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+      pointer-events: none;
+    }
+    #instructions h1 {
+      font-size: 52px;
+      font-weight: 900;
+      letter-spacing: 12px;
+      color: #00cfff;
+      text-shadow: 0 0 30px rgba(0,207,255,0.6);
+      margin-bottom: 8px;
+    }
+    #instructions p {
+      font-size: 15px;
+      color: #aaa;
+      margin-bottom: 4px;
+    }
+    #instructions .click-prompt {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #fff;
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    #instructions.hidden { display: none; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50%       { opacity: 1.0; }
+    }
+    @keyframes slideInRight {
+      from { transform: translateX(120%); opacity: 0; }
+      to   { transform: translateX(0);   opacity: 1; }
+    }
+    @keyframes fadeOut {
+      from { opacity: 1; }
+      to   { opacity: 0; }
+    }
+
+    /* ── Speed vignette ────────────────────────────────────── */
+    #speed-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 55%,
+        rgba(0, 180, 255, 0.18) 100%
+      );
+      transition: opacity 0.25s;
+    }
+
+    /* ── Damage vignette (brief red flash on hurt) ──────────── */
+    #damage-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      background: radial-gradient(
+        ellipse at center,
+        transparent 40%,
+        rgba(255, 30, 0, 0.45) 100%
+      );
+      transition: opacity 0.08s;
+    }
+
+    /* ── Player count badge ─────────────────────────────────── */
+    #player-badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      font-size: 11px;
+      color: #445;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* ── Health bar (bottom center) ─────────────────────────── */
+    #health-bar-wrap {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      text-align: center;
+    }
+    #health-label {
+      font-size: 11px;
+      color: #445;
+      margin-bottom: 3px;
+    }
+    #health-bar-bg {
+      width: 200px;
+      height: 8px;
+      background: #111;
+      border-radius: 4px;
+      border: 1px solid #222;
+      overflow: hidden;
+    }
+    #health-bar-fill {
+      height: 100%;
+      width: 100%;
+      background: #0f0;
+      border-radius: 4px;
+      transition: width 0.15s, background 0.15s;
+    }
+    #health-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #0f0;
+      margin-top: 3px;
+      text-shadow: 0 0 6px rgba(0,255,0,0.4);
+    }
+
+    /* ── Weapon HUD (bottom right) ──────────────────────────── */
+    #weapon-hud {
+      position: absolute;
+      bottom: 110px;
+      right: 200px;
+      text-align: right;
+    }
+    #ammo-display {
+      font-size: 22px;
+      text-shadow: 0 0 6px rgba(0,207,255,0.3);
+    }
+    #reload-indicator {
+      display: none;
+      font-size: 11px;
+      color: #fa0;
+      margin-top: 2px;
+    }
+    #reload-indicator::after {
+      content: '';
+      display: block;
+      height: 3px;
+      background: #333;
+      border-radius: 2px;
+      margin-top: 3px;
+      width: 80px;
+      position: relative;
+    }
+    #reload-progress {
+      height: 3px;
+      background: #fa0;
+      border-radius: 2px;
+      width: 0%;
+      margin-top: 2px;
+      transition: width 0.1s linear;
+    }
+
+    /* ── Kill feed (top right, below badge) ─────────────────── */
+    #kill-feed {
+      position: absolute;
+      top: 34px; right: 10px;
+      width: 300px;
+      text-align: right;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .kf-entry {
+      display: block;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+      margin-bottom: 2px;
+    }
+
+    /* ── Chat overlay ───────────────────────────────────────── */
+    #chat-wrap {
+      position: absolute;
+      bottom: 115px;
+      left: 10px;
+      width: 380px;
+      pointer-events: none;
+    }
+    #chat-messages {
+      max-height: 120px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 2px;
+    }
+    .chat-line {
+      font-size: 12px;
+      color: #ccc;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .chat-line .chat-name { color: #00cfff; }
+    #chat-input-wrap {
+      display: none;
+      margin-top: 4px;
+      pointer-events: auto;
+    }
+    #chat-input {
+      width: 100%;
+      background: rgba(0,0,0,0.7);
+      border: 1px solid #224;
+      color: #0f0;
+      font: 13px 'Consolas', monospace;
+      padding: 4px 8px;
+      outline: none;
+      border-radius: 3px;
+    }
+    #chat-input-wrap.open { display: block; }
+
+    /* ── Scoreboard overlay (Tab key) ───────────────────────── */
+    #scoreboard {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,4,12,0.92);
+      border: 1px solid #0a2040;
+      padding: 20px 28px;
+      min-width: 340px;
+      border-radius: 6px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      color: #ccc;
+    }
+
+    /* ── Name prompt (first launch) ─────────────────────────── */
+    #name-prompt {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 50;
+    }
+    #name-prompt h2 {
+      font-size: 22px;
+      color: #00cfff;
+      letter-spacing: 4px;
+    }
+    #name-prompt p { font-size: 13px; color: #556; }
+    #name-input {
+      background: rgba(0,0,0,0.7);
+      border: 1px solid #0a3050;
+      color: #0f0;
+      font: 16px 'Consolas', monospace;
+      padding: 8px 16px;
+      width: 260px;
+      text-align: center;
+      outline: none;
+      border-radius: 4px;
+      letter-spacing: 2px;
+    }
+    #name-input:focus { border-color: #00cfff; }
+    #name-submit {
+      background: #003850;
+      border: 1px solid #00cfff;
+      color: #00cfff;
+      font: 13px 'Consolas', monospace;
+      padding: 8px 28px;
+      cursor: pointer;
+      border-radius: 3px;
+      letter-spacing: 2px;
+      pointer-events: auto;
+    }
+    #name-submit:hover { background: #005070; }
+
+    /* ── Settings panel (Escape key) ────────────────────────── */
+    #settings-panel {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+      pointer-events: auto;
+    }
+    #settings-inner {
+      background: rgba(0,4,14,0.96);
+      border: 1px solid #0a2040;
+      padding: 28px 36px;
+      min-width: 360px;
+      border-radius: 6px;
+      color: #ccc;
+      font-size: 13px;
+    }
+    #settings-inner h2 {
+      color: #00cfff;
+      font-size: 14px;
+      letter-spacing: 4px;
+      margin-bottom: 22px;
+    }
+    .cfg-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .cfg-label { color: #556; font-size: 12px; width: 110px; }
+    .cfg-value { color: #0cf; font-size: 12px; width: 54px; text-align: right; }
+    .cfg-slider {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 3px;
+      background: #0a2030;
+      border-radius: 2px;
+      outline: none;
+    }
+    .cfg-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #00cfff;
+      cursor: pointer;
+    }
+    #cfg-name {
+      flex: 1;
+      background: rgba(0,0,0,0.5);
+      border: 1px solid #0a2030;
+      color: #0f0;
+      font: 13px 'Consolas', monospace;
+      padding: 5px 10px;
+      outline: none;
+      border-radius: 3px;
+    }
+    #cfg-name:focus { border-color: #00cfff; }
+    #cfg-close {
+      margin-top: 20px;
+      background: transparent;
+      border: 1px solid #0a2040;
+      color: #556;
+      font: 12px 'Consolas', monospace;
+      padding: 7px 20px;
+      cursor: pointer;
+      border-radius: 3px;
+      width: 100%;
+      letter-spacing: 2px;
+    }
+    #cfg-close:hover { border-color: #00cfff; color: #00cfff; }
+
+    /* ── Death / respawn overlay ─────────────────────────────── */
+    #death-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(60,0,0,0.55);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none; /* overlay itself doesn't block, children set own pointer-events */
+    }
+    #death-overlay h2 {
+      font-size: 42px;
+      font-weight: 900;
+      color: #ff2222;
+      letter-spacing: 8px;
+      text-shadow: 0 0 30px rgba(255,0,0,0.8);
+    }
+    #death-countdown {
+      font-size: 16px;
+      color: #ff8888;
+    }
+
+    /* ── Finish announcement ─────────────────────────────────── */
+    #finish-banner {
+      display: none;
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+    #finish-banner h2 {
+      font-size: 36px;
+      font-weight: 900;
+      color: #ffcc00;
+      letter-spacing: 6px;
+      text-shadow: 0 0 24px rgba(255,204,0,0.8);
+      animation: pulse 0.8s ease-in-out infinite;
+    }
+    #finish-time { font-size: 24px; color: #fff; margin-top: 4px; }
+    #finish-pb   { font-size: 13px; color: #0f0; margin-top: 2px; }
+
+    /* ── Checkpoint split display ────────────────────────────── */
+    #split-display {
+      position: absolute;
+      top: 50%; right: 16px;
+      transform: translateY(-50%);
+      text-align: right;
+      font-size: 12px;
+      line-height: 2;
+      pointer-events: none;
+    }
+
+    /* ── Settings gear button ────────────────────────────────── */
+    #settings-btn {
+      position: absolute;
+      bottom: 112px; right: 10px;
+      font-size: 18px;
+      cursor: pointer;
+      color: #223;
+      pointer-events: auto;
+      user-select: none;
+      transition: color 0.2s;
+    }
+    #settings-btn:hover { color: #00cfff; }
+
+    /* ── Mini session stat bar (bottom right, above weapon hud) ─ */
+    #mini-stats {
+      position: absolute;
+      bottom: 152px; right: 12px;
+      display: none;
+      gap: 12px;
+      pointer-events: none;
+      font-family: 'Consolas', monospace;
+    }
+    .mstat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+    }
+    .mstat-val {
+      font-size: 14px;
+      font-weight: bold;
+      color: #ccc;
+      text-shadow: 0 0 4px rgba(0,0,0,0.9);
+    }
+    .mstat-lbl {
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: #333;
+    }
+
+    /* ── Speed number pop (top-center) ──────────────────────── */
+    #speed-readout {
+      position: absolute;
+      top: 12px; left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      font-family: 'Consolas', monospace;
+      color: #225;
+      pointer-events: none;
+      letter-spacing: 2px;
+      transition: color 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <!-- Electron frameless title bar (hidden in browser) -->
+  <div id="electron-titlebar" style="
+    display:none; position:fixed; top:0; left:0; right:0; height:32px;
+    background:rgba(2,4,12,0.96); border-bottom:1px solid rgba(0,207,255,0.08);
+    z-index:99999; align-items:center; justify-content:space-between;
+    -webkit-app-region:drag; user-select:none;
+  ">
+    <div style="display:flex;align-items:center;gap:8px;padding-left:12px;pointer-events:none">
+      <div style="font-size:11px;font-weight:900;letter-spacing:4px;color:#00cfff;font-family:monospace">CuunSurf</div>
+      <div style="font-size:8px;letter-spacing:3px;color:#1a3040;font-family:monospace">N GAMES</div>
+    </div>
+    <div style="display:flex;-webkit-app-region:no-drag;align-items:center;gap:6px;padding-right:8px">
+      <button id="tb-min" title="Minimize" onclick="window.electron?.minimize()" style="
+        width:40px;height:24px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+        border-radius:4px;color:#aaa;font-size:13px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;transition:all 0.1s;
+      " onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#fff'"
+         onmouseout="this.style.background='rgba(255,255,255,0.04)';this.style.color='#aaa'">─</button>
+      <button id="tb-max" title="Maximize" onclick="window.electron?.maximize()" style="
+        width:40px;height:24px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+        border-radius:4px;color:#aaa;font-size:10px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;transition:all 0.1s;
+      " onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='#fff'"
+         onmouseout="this.style.background='rgba(255,255,255,0.04)';this.style.color='#aaa'">⬜</button>
+      <button id="tb-close" title="Close" onclick="window.electron?.close()" style="
+        width:40px;height:24px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+        border-radius:4px;color:#aaa;font-size:13px;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;transition:all 0.1s;
+      " onmouseover="this.style.background='rgba(200,30,30,0.7)';this.style.color='#fff';this.style.borderColor='#c00'"
+         onmouseout="this.style.background='rgba(255,255,255,0.04)';this.style.color='#aaa';this.style.borderColor='rgba(255,255,255,0.08)'">✕</button>
+    </div>
+  </div>
+
+  <div id="ui-overlay">
+    <div id="debug-hud"></div>
+    <canvas id="speed-graph" width="280" height="90"></canvas>
+    <canvas id="tick-graph"  width="180" height="90"></canvas>
+    <div id="crosshair"></div>
+    <div id="hit-marker"></div>
+    <div id="speed-vignette"></div>
+    <div id="damage-vignette"></div>
+    <div id="player-badge">⬡ 1 online</div>
+
+    <!-- Health bar -->
+    <div id="health-bar-wrap">
+      <div id="health-label">HP</div>
+      <div id="health-bar-bg"><div id="health-bar-fill"></div></div>
+      <div id="health-value">100</div>
+    </div>
+
+    <!-- Weapon HUD -->
+    <div id="weapon-hud">
+      <div id="ammo-display"><span style="color:#0cf;font-weight:bold">30</span><span style="color:#334"> / 30</span></div>
+      <div id="reload-indicator">
+        RELOADING
+        <div id="reload-progress"></div>
+      </div>
+    </div>
+
+    <!-- Kill feed -->
+    <div id="kill-feed"></div>
+
+    <!-- Chat -->
+    <div id="chat-wrap">
+      <div id="chat-messages"></div>
+      <div id="chat-input-wrap">
+        <input id="chat-input" type="text" maxlength="120" placeholder="Say something… (Enter to send, Esc to cancel)" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- Scoreboard -->
+    <div id="scoreboard"></div>
+
+    <!-- Death overlay -->
+    <div id="death-overlay">
+      <h2>YOU DIED</h2>
+      <div id="death-countdown">Respawning…</div>
+      <button id="death-respawn-btn" onclick="window.__surf?.net?.sendRequestRespawn?.()" style="
+        margin-top:12px; padding:8px 28px;
+        background:rgba(255,30,30,0.15); border:1px solid rgba(255,60,60,0.4);
+        color:#ff8888; font-family:monospace; font-size:12px; letter-spacing:3px;
+        border-radius:4px; cursor:pointer; pointer-events:auto;
+        transition:all 0.15s;
+      "
+        onmouseover="this.style.background='rgba(255,30,30,0.3)'"
+        onmouseout="this.style.background='rgba(255,30,30,0.15)'"
+      >[ R ] RESPAWN NOW</button>
+    </div>
+
+    <!-- Finish banner -->
+    <div id="finish-banner">
+      <h2>FINISH!</h2>
+      <div id="finish-time"></div>
+      <div id="finish-pb"></div>
+    </div>
+
+    <!-- Checkpoint splits -->
+    <div id="split-display"></div>
+
+    <!-- XP / Level HUD (bottom-left corner, in-game) -->
+    <div id="xp-hud" style="
+      position:absolute; bottom:108px; left:16px;
+      pointer-events:none; display:none;
+    ">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+        <div id="xp-level-badge" style="
+          background:rgba(0,207,255,0.15); border:1px solid #00cfff44;
+          color:#00cfff; font-size:11px; font-weight:bold;
+          padding:2px 7px; border-radius:10px; font-family:monospace;
+        ">Lv 1</div>
+        <div id="xp-title" style="font-size:10px;color:#555;font-family:monospace;letter-spacing:1px">ROOKIE</div>
+      </div>
+      <div style="width:140px;height:5px;background:rgba(0,0,0,0.5);border-radius:3px;overflow:hidden;">
+        <div id="xp-bar-fill" style="
+          height:100%; width:0%;
+          background:linear-gradient(90deg,#0077aa,#00cfff);
+          border-radius:3px; transition:width 0.8s ease;
+        "></div>
+      </div>
+      <div id="xp-label" style="font-size:9px;color:#333;font-family:monospace;margin-top:2px">0 / 100 XP</div>
+    </div>
+
+    <!-- Mini session stat bar (bottom-right) -->
+    <div id="mini-stats" style="display:none;position:absolute;bottom:152px;right:12px;display:none;gap:12px;pointer-events:none;font-family:monospace">
+      <div class="mstat"><span id="ms-kd"  class="mstat-val">0.0</span><span class="mstat-lbl">K/D</span></div>
+      <div class="mstat"><span id="ms-maps" class="mstat-val">0</span>  <span class="mstat-lbl">MAPS</span></div>
+      <div class="mstat"><span id="ms-top"  class="mstat-val">0</span>  <span class="mstat-lbl">TOP</span></div>
+      <div class="mstat"><span id="ms-xp"   class="mstat-val">+0</span> <span class="mstat-lbl">XP</span></div>
+    </div>
+
+    <!-- Speed readout (top-center) -->
+    <div id="speed-readout"></div>
+
+    <!-- Quick-reset hint (shown during active run) -->
+    <div id="quick-reset-hint" style="
+      position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+      pointer-events:none; font-family:monospace; font-size:10px;
+      color:rgba(255,255,255,0.18); letter-spacing:3px;
+      display:none; white-space:nowrap;
+    ">[ Q ] RESET RUN</div>
+
+    <!-- Level-up toast (bottom-right corner) -->
+    <div id="levelup-toast" style="
+      position:absolute; bottom:180px; right:16px;
+      display:none; text-align:right; pointer-events:none; z-index:8000;
+    ">
+      <div style="
+        background:rgba(5,5,18,0.92); border:1px solid rgba(0,207,255,0.4);
+        border-right:3px solid #00cfff;
+        padding:10px 16px 10px 20px; border-radius:6px 0 0 6px;
+        box-shadow:-4px 0 20px rgba(0,207,255,0.15);
+      ">
+        <div style="font-size:8px;letter-spacing:4px;color:#00cfff66;font-family:monospace">LEVEL UP</div>
+        <div id="levelup-num" style="font-size:20px;font-weight:900;color:#00cfff;font-family:monospace;line-height:1.2">1 → 2</div>
+        <div id="levelup-title" style="font-size:9px;color:#445;font-family:monospace;letter-spacing:2px">APPRENTICE</div>
+      </div>
+    </div>
+
+    <!-- Connection lost overlay -->
+    <div id="reconnect-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);
+         align-items:center;justify-content:center;flex-direction:column;gap:10px;pointer-events:none;z-index:60">
+      <div style="font-size:18px;color:#f44;letter-spacing:4px">CONNECTION LOST</div>
+      <div style="font-size:12px;color:#556">Reconnecting…</div>
+    </div>
+
+    <!-- Settings gear -->
+    <div id="settings-btn" title="Settings (Esc)">⚙</div>
+
+    <!-- Profile selection screen -->
+    <div id="profile-screen" style="
+      display:none; position:absolute; inset:0; z-index:9500;
+      background:rgba(2,4,12,0.97); align-items:center; justify-content:center;
+      flex-direction:column; gap:40px; font-family:monospace;
+    ">
+      <div>
+        <div style="font-size:11px;letter-spacing:8px;color:#2a4a5a;text-align:center;margin-bottom:6px">N GAMES NETWORK</div>
+        <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:#00cfff;text-align:center;
+          text-shadow:0 0 40px rgba(0,207,255,0.4)">CuunSurf</div>
+        <div style="font-size:10px;letter-spacing:5px;color:#223344;text-align:center;margin-top:4px">SELECT YOUR PROFILE</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:420px">
+        <!-- Keshawn -->
+        <div class="profile-card" data-id="keshawn" data-name="Keshawn" data-color="#80e060" style="
+          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+          background:rgba(128,224,96,0.05); border:1px solid rgba(128,224,96,0.2);
+          transition:all 0.15s;
+        ">
+          <div style="width:20px;height:20px;border-radius:50%;background:#80e060;margin:0 auto 12px;
+            box-shadow:0 0 14px rgba(128,224,96,0.6)"></div>
+          <div style="font-size:16px;font-weight:bold;color:#80e060;letter-spacing:2px">Keshawn</div>
+        </div>
+        <!-- Sean -->
+        <div class="profile-card" data-id="sean" data-name="Sean" data-color="#f0c040" style="
+          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+          background:rgba(240,192,64,0.05); border:1px solid rgba(240,192,64,0.2);
+          transition:all 0.15s;
+        ">
+          <div style="width:20px;height:20px;border-radius:50%;background:#f0c040;margin:0 auto 12px;
+            box-shadow:0 0 14px rgba(240,192,64,0.6)"></div>
+          <div style="font-size:16px;font-weight:bold;color:#f0c040;letter-spacing:2px">Sean</div>
+        </div>
+        <!-- Dart -->
+        <div class="profile-card" data-id="dart" data-name="Dart" data-color="#e04040" style="
+          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+          background:rgba(224,64,64,0.05); border:1px solid rgba(224,64,64,0.2);
+          transition:all 0.15s;
+        ">
+          <div style="width:20px;height:20px;border-radius:50%;background:#e04040;margin:0 auto 12px;
+            box-shadow:0 0 14px rgba(224,64,64,0.6)"></div>
+          <div style="font-size:16px;font-weight:bold;color:#e04040;letter-spacing:2px">Dart</div>
+        </div>
+        <!-- Amari -->
+        <div class="profile-card" data-id="amari" data-name="Amari" data-color="#40c0e0" style="
+          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+          background:rgba(64,192,224,0.05); border:1px solid rgba(64,192,224,0.2);
+          transition:all 0.15s;
+        ">
+          <div style="width:20px;height:20px;border-radius:50%;background:#40c0e0;margin:0 auto 12px;
+            box-shadow:0 0 14px rgba(64,192,224,0.6)"></div>
+          <div style="font-size:16px;font-weight:bold;color:#40c0e0;letter-spacing:2px">Amari</div>
+        </div>
+      </div>
+
+      <div style="font-size:9px;color:#1a2a2a;letter-spacing:3px">CuunSurf · N Games Network</div>
+    </div>
+
+    <!-- Name prompt (legacy — hidden, kept for SettingsManager compat) -->
+    <div id="name-prompt" style="display:none">
+      <h2>CuunSurf</h2>
+      <p>Enter your name to join</p>
+      <input id="name-input" type="text" maxlength="20" placeholder="Your name" autocomplete="off" spellcheck="false">
+      <button id="name-submit">PLAY</button>
+    </div>
+
+    <!-- Settings panel -->
+    <div id="settings-panel">
+      <div id="settings-inner">
+        <h2>SETTINGS</h2>
+        <div class="cfg-row">
+          <span class="cfg-label">NAME</span>
+          <input id="cfg-name" type="text" maxlength="20" spellcheck="false">
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">SENSITIVITY</span>
+          <input id="cfg-sensitivity" class="cfg-slider" type="range" min="0.0005" max="0.006" step="0.0001" value="0.002">
+          <span id="cfg-sensitivity-label" class="cfg-value">0.0020</span>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">FOV</span>
+          <input id="cfg-fov" class="cfg-slider" type="range" min="70" max="120" step="1" value="90">
+          <span id="cfg-fov-label" class="cfg-value">90</span>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">VOLUME</span>
+          <input id="cfg-volume" class="cfg-slider" type="range" min="0" max="1" step="0.05" value="0.7">
+          <span id="cfg-volume-label" class="cfg-value">70%</span>
+        </div>
+        <div class="cfg-row">
+          <span class="cfg-label">GHOST COLOR</span>
+          <input id="cfg-color" type="color" value="#00cfff" style="width:48px;height:24px;border:1px solid #0a2040;background:none;cursor:pointer;border-radius:3px;">
+        </div>
+        <button id="cfg-close">CLOSE (ESC)</button>
+      </div>
+    </div>
+
+    <div id="instructions">
+      <h1>CuunSurf</h1>
+      <p>WASD &nbsp;·&nbsp; Mouse Look &nbsp;·&nbsp; Space Jump &nbsp;·&nbsp; LMB Shoot</p>
+      <p style="color:#556;font-size:12px">Tab: scoreboard &nbsp;·&nbsp; Enter: chat &nbsp;·&nbsp; R: reload &nbsp;·&nbsp; M: menu &nbsp;·&nbsp; F: inspect knife</p>
+      <div class="click-prompt">Click to start</div>
+    </div>
+  </div>
+
+  <!-- Loading splash (hidden after init) -->
+  <div id="loading-splash" style="
+    position:fixed; inset:0; z-index:99999;
+    background:#000; display:flex;
+    align-items:center; justify-content:center;
+    flex-direction:column; gap:20px;
+    font-family:'Consolas',monospace;
+    transition:opacity 0.6s ease;
+  ">
+    <div style="position:relative;text-align:center">
+      <div style="
+        font-size:72px; font-weight:900; color:#00cfff;
+        letter-spacing:20px;
+        text-shadow:0 0 60px rgba(0,207,255,0.6), 0 0 120px rgba(0,207,255,0.2);
+        animation:splashPulse 2s ease-in-out infinite;
+      ">CuunSurf</div>
+      <div style="font-size:10px;letter-spacing:8px;color:#1a4a5a;margin-top:-4px">N GAMES</div>
+    </div>
+    <div id="loading-bar-wrap" style="width:220px;height:3px;background:#0a0a0a;border-radius:2px;overflow:hidden">
+      <div id="loading-bar" style="
+        height:100%; width:0%;
+        background:linear-gradient(90deg,#003850,#00cfff);
+        border-radius:2px; transition:width 0.3s ease;
+      "></div>
+    </div>
+    <div id="loading-text" style="font-size:10px;letter-spacing:3px;color:#1a3a4a">INITIALIZING</div>
+  </div>
+
+  <style>
+    @keyframes splashPulse {
+      0%,100% { opacity:0.85; text-shadow:0 0 40px rgba(0,207,255,0.4); }
+      50%      { opacity:1.0;  text-shadow:0 0 80px rgba(0,207,255,0.8), 0 0 140px rgba(0,207,255,0.3); }
+    }
+  </style>
+
+  <script type="module" src="/src/client/main.js"></script>
+  <script>
+    // Show Electron title bar + offset UI when running as desktop app
+    if (window.electron) {
+      const tb = document.getElementById('electron-titlebar');
+      if (tb) tb.style.display = 'flex';
+      // Push the game canvas down by the title bar height
+      const overlay = document.getElementById('ui-overlay');
+      if (overlay) {
+        overlay.style.top    = '32px';
+        overlay.style.height = 'calc(100% - 32px)';
+      }
+      // Keep maximize icon in sync
+      window.electron.onMaximizeChange?.(isMax => {
+        const btn = document.getElementById('tb-max');
+        if (btn) btn.textContent = isMax ? '❐' : '⬜';
+      });
+      // Hide/show title bar when entering/leaving exclusive fullscreen
+      window.electron.onTitlebarVisible?.(visible => {
+        const tb  = document.getElementById('electron-titlebar');
+        const ov  = document.getElementById('ui-overlay');
+        if (tb) tb.style.display = visible ? 'flex' : 'none';
+        if (ov) { ov.style.top = visible ? '32px' : '0'; ov.style.height = visible ? 'calc(100% - 32px)' : '100%'; }
+      });
+      // Apply saved window mode on launch
+      const savedMode = localStorage.getItem('cuunsurf_winmode');
+      if (savedMode && savedMode !== 'windowed') window.electron.setWindowMode?.(savedMode);
+      // Expose net reference for the death-screen respawn button
+      window.__surf = window.__surf || {};
+    }
+  </script>
+</body>
+</html>
