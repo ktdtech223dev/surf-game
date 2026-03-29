@@ -112,15 +112,6 @@ export const MapFactory = {
       _addRampMesh(scene, [lv0, lv1, lv2, lv3], pal.ramp, pal.edge, TAG);
       _addRampMesh(scene, [rv0, rv1, rv2, rv3], pal.ramp, pal.edge, TAG);
 
-      // ── Ceiling for narrower advanced sections ────────────────────────
-      if (sec.w < 220) {
-        const ceilW = outerX * 2 + 40;
-        const ceilH = outerX * 0.85;
-        const midY  = (startY + endY) / 2 + ceilH;
-        _buildBox(scene, 0, midY, startZ + sec.depth / 2,
-          ceilW, 14, sec.depth, pal.ramp, pal.edge, TAG);
-      }
-
       // ── Side ledges ────────────────────────────────────────────────────
       const ledgeW   = 60;
       const ledgeMidZ = startZ + sec.depth / 2;
@@ -186,7 +177,7 @@ export const MapFactory = {
     world.addKillZone(Vec3.create( 650,  -5000, -500), Vec3.create(4000, 1000, curZ + 500));
 
     // ── Background grid ────────────────────────────────────────────────
-    const grid = new THREE.GridHelper(40000, 300, 0x111122, 0x0d0d18);
+    const grid = new THREE.GridHelper(40000, 300, 0x223344, 0x1a2a3a);
     grid.position.y = curY - 100;
     grid.userData[TAG] = true;
     scene.add(grid);
