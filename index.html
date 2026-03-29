@@ -685,73 +685,6 @@
     <!-- Settings gear -->
     <div id="settings-btn" title="Settings (Esc)">⚙</div>
 
-    <!-- Profile selection screen -->
-    <div id="profile-screen" style="
-      display:none; position:fixed; inset:0; z-index:100001;
-      background:rgba(2,4,12,0.97); align-items:center; justify-content:center;
-      flex-direction:column; gap:40px; font-family:monospace;
-    ">
-      <div>
-        <div style="font-size:11px;letter-spacing:8px;color:#2a4a5a;text-align:center;margin-bottom:6px">N GAMES NETWORK</div>
-        <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:#00cfff;text-align:center;
-          text-shadow:0 0 40px rgba(0,207,255,0.4)">CuunSurf</div>
-        <div style="font-size:10px;letter-spacing:5px;color:#223344;text-align:center;margin-top:4px">SELECT YOUR PROFILE</div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:420px">
-        <!-- Keshawn -->
-        <div class="profile-card" data-id="keshawn" data-name="Keshawn" data-color="#80e060" style="
-          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
-          background:rgba(128,224,96,0.05); border:1px solid rgba(128,224,96,0.2);
-          transition:all 0.15s;
-        ">
-          <div style="width:20px;height:20px;border-radius:50%;background:#80e060;margin:0 auto 12px;
-            box-shadow:0 0 14px rgba(128,224,96,0.6)"></div>
-          <div style="font-size:16px;font-weight:bold;color:#80e060;letter-spacing:2px">Keshawn</div>
-        </div>
-        <!-- Sean -->
-        <div class="profile-card" data-id="sean" data-name="Sean" data-color="#f0c040" style="
-          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
-          background:rgba(240,192,64,0.05); border:1px solid rgba(240,192,64,0.2);
-          transition:all 0.15s;
-        ">
-          <div style="width:20px;height:20px;border-radius:50%;background:#f0c040;margin:0 auto 12px;
-            box-shadow:0 0 14px rgba(240,192,64,0.6)"></div>
-          <div style="font-size:16px;font-weight:bold;color:#f0c040;letter-spacing:2px">Sean</div>
-        </div>
-        <!-- Dart -->
-        <div class="profile-card" data-id="dart" data-name="Dart" data-color="#e04040" style="
-          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
-          background:rgba(224,64,64,0.05); border:1px solid rgba(224,64,64,0.2);
-          transition:all 0.15s;
-        ">
-          <div style="width:20px;height:20px;border-radius:50%;background:#e04040;margin:0 auto 12px;
-            box-shadow:0 0 14px rgba(224,64,64,0.6)"></div>
-          <div style="font-size:16px;font-weight:bold;color:#e04040;letter-spacing:2px">Dart</div>
-        </div>
-        <!-- Amari -->
-        <div class="profile-card" data-id="amari" data-name="Amari" data-color="#40c0e0" style="
-          padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
-          background:rgba(64,192,224,0.05); border:1px solid rgba(64,192,224,0.2);
-          transition:all 0.15s;
-        ">
-          <div style="width:20px;height:20px;border-radius:50%;background:#40c0e0;margin:0 auto 12px;
-            box-shadow:0 0 14px rgba(64,192,224,0.6)"></div>
-          <div style="font-size:16px;font-weight:bold;color:#40c0e0;letter-spacing:2px">Amari</div>
-        </div>
-      </div>
-
-      <div style="font-size:9px;color:#1a2a2a;letter-spacing:3px">CuunSurf · N Games Network</div>
-    </div>
-
-    <!-- Name prompt (legacy — hidden, kept for SettingsManager compat) -->
-    <div id="name-prompt" style="display:none">
-      <h2>CuunSurf</h2>
-      <p>Enter your name to join</p>
-      <input id="name-input" type="text" maxlength="20" placeholder="Your name" autocomplete="off" spellcheck="false">
-      <button id="name-submit">PLAY</button>
-    </div>
-
     <!-- Settings panel -->
     <div id="settings-panel">
       <div id="settings-inner">
@@ -789,6 +722,73 @@
       <p style="color:#556;font-size:12px">Tab: scoreboard &nbsp;·&nbsp; Enter: chat &nbsp;·&nbsp; R: reload &nbsp;·&nbsp; M: menu &nbsp;·&nbsp; F: inspect knife</p>
       <div class="click-prompt">Click to start</div>
     </div>
+  </div>
+
+  <!-- Profile selection screen (outside ui-overlay so pointer-events and z-index work) -->
+  <div id="profile-screen" style="
+    display:none; position:fixed; inset:0; z-index:100001;
+    background:rgba(2,4,12,0.97); align-items:center; justify-content:center;
+    flex-direction:column; gap:40px; font-family:monospace;
+  ">
+    <div>
+      <div style="font-size:11px;letter-spacing:8px;color:#2a4a5a;text-align:center;margin-bottom:6px">N GAMES NETWORK</div>
+      <div style="font-size:28px;font-weight:900;letter-spacing:6px;color:#00cfff;text-align:center;
+        text-shadow:0 0 40px rgba(0,207,255,0.4)">CuunSurf</div>
+      <div style="font-size:10px;letter-spacing:5px;color:#223344;text-align:center;margin-top:4px">SELECT YOUR PROFILE</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;width:420px">
+      <!-- Keshawn -->
+      <div class="profile-card" data-id="keshawn" data-name="Keshawn" data-color="#80e060" style="
+        padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+        background:rgba(128,224,96,0.05); border:1px solid rgba(128,224,96,0.2);
+        transition:all 0.15s;
+      ">
+        <div style="width:20px;height:20px;border-radius:50%;background:#80e060;margin:0 auto 12px;
+          box-shadow:0 0 14px rgba(128,224,96,0.6)"></div>
+        <div style="font-size:16px;font-weight:bold;color:#80e060;letter-spacing:2px">Keshawn</div>
+      </div>
+      <!-- Sean -->
+      <div class="profile-card" data-id="sean" data-name="Sean" data-color="#f0c040" style="
+        padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+        background:rgba(240,192,64,0.05); border:1px solid rgba(240,192,64,0.2);
+        transition:all 0.15s;
+      ">
+        <div style="width:20px;height:20px;border-radius:50%;background:#f0c040;margin:0 auto 12px;
+          box-shadow:0 0 14px rgba(240,192,64,0.6)"></div>
+        <div style="font-size:16px;font-weight:bold;color:#f0c040;letter-spacing:2px">Sean</div>
+      </div>
+      <!-- Dart -->
+      <div class="profile-card" data-id="dart" data-name="Dart" data-color="#e04040" style="
+        padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+        background:rgba(224,64,64,0.05); border:1px solid rgba(224,64,64,0.2);
+        transition:all 0.15s;
+      ">
+        <div style="width:20px;height:20px;border-radius:50%;background:#e04040;margin:0 auto 12px;
+          box-shadow:0 0 14px rgba(224,64,64,0.6)"></div>
+        <div style="font-size:16px;font-weight:bold;color:#e04040;letter-spacing:2px">Dart</div>
+      </div>
+      <!-- Amari -->
+      <div class="profile-card" data-id="amari" data-name="Amari" data-color="#40c0e0" style="
+        padding:22px 20px; border-radius:10px; cursor:pointer; text-align:center;
+        background:rgba(64,192,224,0.05); border:1px solid rgba(64,192,224,0.2);
+        transition:all 0.15s;
+      ">
+        <div style="width:20px;height:20px;border-radius:50%;background:#40c0e0;margin:0 auto 12px;
+          box-shadow:0 0 14px rgba(64,192,224,0.6)"></div>
+        <div style="font-size:16px;font-weight:bold;color:#40c0e0;letter-spacing:2px">Amari</div>
+      </div>
+    </div>
+
+    <div style="font-size:9px;color:#1a2a2a;letter-spacing:3px">CuunSurf · N Games Network</div>
+  </div>
+
+  <!-- Name prompt (legacy — hidden, kept for SettingsManager compat) -->
+  <div id="name-prompt" style="display:none">
+    <h2>CuunSurf</h2>
+    <p>Enter your name to join</p>
+    <input id="name-input" type="text" maxlength="20" placeholder="Your name" autocomplete="off" spellcheck="false">
+    <button id="name-submit">PLAY</button>
   </div>
 
   <!-- Loading splash (hidden after init) -->
