@@ -168,39 +168,77 @@ export function getDailyMapId()  { return `daily_${dailySeed()}`; }
 export function getWeeklyMapId() { return `weekly_${weeklySeed()}`; }
 
 // ── MapCatalog-format procedural entry ────────────────────────────────────────
-const PALETTE_KEYS = ['dark_blue', 'ocean_green', 'sunset_red', 'ember', 'twilight', 'teal'];
+
+// Palette keys must match those defined in ArtStyle.js PALETTE object
+const PALETTE_KEYS = [
+  'shoreline', 'coastal', 'basin', 'inlet', 'cove', 'bay',
+  'gorge', 'canyon', 'ravine', 'chasm', 'abyss', 'ridge',
+  'storm', 'tempest', 'gale', 'squall', 'cyclone', 'vortex',
+  'void', 'null', 'zenith', 'apex', 'omega', 'sigma',
+];
+
 const DIFFICULTIES = ['beginner', 'intermediate', 'advanced', 'expert'];
+
+// Bank ratio ranges per difficulty — matches the physics-correct ranges in MapCatalog
+const BANK_RATIO_RANGES = {
+  beginner:     { lo: 2.0, hi: 2.5 },
+  intermediate: { lo: 2.6, hi: 3.4 },
+  advanced:     { lo: 3.5, hi: 4.5 },
+  expert:       { lo: 4.6, hi: 6.0 },
+};
+
+// Width ranges per difficulty
+const WIDTH_RANGES = {
+  beginner:     { lo: 280, hi: 380 },
+  intermediate: { lo: 200, hi: 280 },
+  advanced:     { lo: 140, hi: 220 },
+  expert:       { lo: 90,  hi: 180 },
+};
 
 /**
  * Returns a MapCatalog-format definition object generated deterministically
  * from the given numeric seed. Compatible with MapFactory._buildFromDef().
+ *
+ * dropY uses the correct bank-ratio formula:
+ *   outerX = w/2 + 60
+ *   dropY  = -round(outerX * bankRatio)
+ * This guarantees normalY < 0.7 (surfable) for all sections.
  */
 export function generateProceduralEntry(seed) {
   const rng = mulberry32(seed);
 
-  const sectionCount = rng.int(2, 4);
+  const diffIdx   = rng.int(0, DIFFICULTIES.length - 1);
+  const diff      = DIFFICULTIES[diffIdx];
+  const brrRange  = BANK_RATIO_RANGES[diff];
+  const wRange    = WIDTH_RANGES[diff];
+  const bankRatio = Math.round(rng.range(brrRange.lo, brrRange.hi) * 100) / 100;
+
+  const sectionCount = rng.int(3, 6);
   const sections = [];
+
+  // Start with a wide section and taper down
+  const baseW = Math.round(rng.range(wRange.lo, wRange.hi));
   for (let i = 0; i < sectionCount; i++) {
-    sections.push({
-      w:     Math.round(rng.range(180, 320)),
-      depth: Math.round(rng.range(600, 1400)),
-      angle: 0,
-      dropY: -Math.round(rng.range(200, 600)),
-    });
+    // Gradually narrow each section; taper by 0–15 units per section
+    const w     = Math.max(wRange.lo, baseW - i * Math.round(rng.range(5, 15)));
+    const outerX = w / 2 + 60;
+    const dropY  = -Math.round(outerX * bankRatio);
+    const depth  = Math.round(rng.range(1200, 2600));
+    sections.push({ w, depth, dropY });
   }
 
   const palIdx  = rng.int(0, PALETTE_KEYS.length - 1);
-  const diffIdx = rng.int(0, DIFFICULTIES.length - 1);
 
   return {
     id:         `proc_${seed}`,
     name:       `Proc #${seed % 10000}`,
-    difficulty: DIFFICULTIES[diffIdx],
+    difficulty: diff,
     knifeId:    'knife_daily',
     paletteKey: PALETTE_KEYS[palIdx],
     desc:       `Procedural map (seed ${seed})`,
+    bankRatio,
     sections,
-    padLens:    [300, 200, 200, 200, 200, 400],
+    padLens:    [300, 220, 220, 220, 220, 220, 400],
     spawnY:     0,
   };
 }

@@ -154,7 +154,8 @@ export const MapFactory = {
               0, curveStartZ,
               cs.radius, cs.angle,
               cs.width, cs.height ?? 20,
-              curY, pal
+              curY, pal,
+              def.bankRatio ?? 4.0
             );
           }
         }
@@ -327,16 +328,16 @@ function _buildStars(scene, count, edgeColor, tag) {
  * The ramp V-shape is computed in a local coordinate system and then rotated
  * into world space.
  */
-function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, _height, y, pal) {
+function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, _height, y, pal, bankRatio = 4.0) {
   // More segments = smoother curve
   const SEGS     = 14;
   const arcStep  = totalAngle / SEGS;
   const outerHalfW = rampWidth / 2 + 50;
 
   // Bank height: outer edges are bankH units ABOVE inner (center) edge.
-  // Ratio ~4.2 matches the ~75° bank angle of straight sections so the
-  // curve walls feel consistent with what the player just left.
-  const BANK_RATIO = 4.2;
+  // bankRatio is passed from the map definition so curves match the
+  // straight section bank angle of the same map.
+  const BANK_RATIO = bankRatio;
   const bankH = outerHalfW * BANK_RATIO;
 
   // Travel drop: very gentle — curves sit on flat connector pads so they
