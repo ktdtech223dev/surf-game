@@ -194,7 +194,8 @@ export const MapFactory = {
 
     // ── Global bottom kill zone ─────────────────────────────────────────
     const lowestY = sectionBounds.reduce((m, s) => Math.min(m, s.endY), curY);
-    world.addKillZone(Vec3.create(-9000, lowestY - 300, -9000), Vec3.create(9000, lowestY - 50, 9000));
+    // Wide enough to cover expert maps that spread 12 000+ units in X
+    world.addKillZone(Vec3.create(-20000, lowestY - 400, -20000), Vec3.create(20000, lowestY - 60, 20000));
 
     // ── Background grid ────────────────────────────────────────────────
     const grid = new THREE.GridHelper(40000, 300, 0x223344, 0x1a2a3a);
