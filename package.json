@@ -1,6 +1,6 @@
 {
   "name": "cuunsurf",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "CuunSurf — 3D multiplayer surf game · N Games Network",
   "type": "module",
   "main": "electron/main.cjs",
