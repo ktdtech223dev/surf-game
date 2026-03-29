@@ -51,8 +51,8 @@ export const KNIFE_TYPES = [
     name:     'Butterfly',
     desc:     'Balisong with a split handle. Mesmerizing flip animation.',
     rarity:   RARITY.RARE,
-    unlockLevel: 10,
-    unlockDesc: 'Reach Level 10',
+    unlockLevel: 7,
+    unlockDesc: 'Reach Level 7',
   },
   {
     id:       'bayonet',

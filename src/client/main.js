@@ -347,8 +347,8 @@ async function _showFinish(timeSec) {
     }
   }
 
-  // Show reward screen after 1.5s — online mode only (not solo)
-  if (_mode !== 'solo') {
+  // Show reward screen after 1.5s — solo mode only (online waits for round end)
+  if (_mode === 'solo') {
     setTimeout(() => {
       rewardScr.show({
         xpGains, xpSystem: xpSys, oldLevel, oldXP,
@@ -613,7 +613,7 @@ net.onWelcome = (id, name) => {
   net.sendMeta(settings.name, settings.color);
 };
 
-net.onPeerUpdate  = (id, snap, t) => { ghosts.addSnapshot(id, snap, t ?? Date.now()); scoreboard.upsert(id, { id, name: snap.name, hp: snap.hp }); };
+net.onPeerUpdate  = (id, snap, t) => { ghosts.addSnapshot(id, snap, t ?? Date.now()); const _su = { id, hp: snap.hp }; if (snap.name) _su.name = snap.name; scoreboard.upsert(id, _su); };
 net.onPeerLeave   = (id) => { ghosts.remove(id); scoreboard.remove(id); };
 net.onDmg         = (targetId, _, hp) => { ghosts.setHp(targetId, hp); ghosts.flashHit(targetId); scoreboard.upsert(targetId, { hp }); };
 net.onHurt        = (_dmg, hp) => {

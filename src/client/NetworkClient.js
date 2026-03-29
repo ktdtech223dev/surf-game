@@ -93,6 +93,8 @@ export class NetworkClient {
 
       case 'join':
         this.playerCount++;
+        // Surface name immediately so scoreboard doesn't show "Player X"
+        if (msg.name && this.onMetaUpdate) this.onMetaUpdate(msg.id, msg.name, msg.color ?? null);
         break;
 
       case 'snap': {

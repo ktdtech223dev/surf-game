@@ -34,6 +34,16 @@ router.get('/xp', requireAuth, (req, res) => {
     db.prepare('INSERT OR IGNORE INTO player_xp (player_id, xp, level) VALUES (?, 0, 1)').run(pid);
     row = { xp: 0, level: 1 };
   }
+
+  // Backfill: grant any level rewards the player should have earned but doesn't yet have
+  for (let lvl = 1; lvl <= row.level; lvl++) {
+    const reward = LEVEL_REWARDS[lvl];
+    if (reward) {
+      db.prepare('INSERT OR IGNORE INTO unlocks (player_id, item_type, item_id) VALUES (?, ?, ?)')
+        .run(pid, reward.type, reward.id);
+    }
+  }
+
   const xpNeeded = xpForNextLevel(row.level);
   res.json({ xp: row.xp, level: row.level, xpNeeded, xpForNextLevel: xpNeeded });
 });
@@ -98,7 +108,8 @@ router.post('/xp/add', requireAuth, (req, res) => {
 // type: 'knife_type' for knife models, 'knife_skin' for cosmetic skins
 const LEVEL_REWARDS = {
   5:   { type: 'knife_type', id: 'karambit',    name: 'Karambit',        rarity: 'uncommon' },
-  10:  { type: 'knife_type', id: 'butterfly',   name: 'Butterfly Knife', rarity: 'rare'     },
+  7:   { type: 'knife_type', id: 'butterfly',   name: 'Butterfly Knife', rarity: 'rare'     },
+  10:  { type: 'knife_skin', id: 'skin_neon',   name: 'Neon Skin Pack',  rarity: 'uncommon' },
   15:  { type: 'knife_skin', id: 'skin_neon',   name: 'Neon Skin Pack',  rarity: 'uncommon' },
   20:  { type: 'knife_type', id: 'bayonet',     name: 'M9 Bayonet',      rarity: 'rare'     },
   25:  { type: 'knife_type', id: 'tanto',       name: 'Tanto Knife',     rarity: 'rare'     },

@@ -124,16 +124,15 @@ let nextId = 1;
 
 // In-memory leaderboard (top 10 best times, all maps combined or per map)
 // For WS leaderboard we use a simple flat array
-const wsLeaderboard = []; // [{ name, mapId, time_ms, date }]
+const wsLeaderboard = []; // [{ name, mapId, time, date }]  time = seconds (float)
 
 function recordWsFinish(name, mapId, timeSec) {
-  const timeMs = Math.round(timeSec * 1000);
-  const key    = `${name}|${mapId}`;
-  const idx    = wsLeaderboard.findIndex(e => `${e.name}|${e.mapId}` === key);
-  if (idx !== -1 && wsLeaderboard[idx].time_ms <= timeMs) return;
+  const key = `${name}|${mapId}`;
+  const idx = wsLeaderboard.findIndex(e => `${e.name}|${e.mapId}` === key);
+  if (idx !== -1 && wsLeaderboard[idx].time <= timeSec) return;
   if (idx !== -1) wsLeaderboard.splice(idx, 1);
-  wsLeaderboard.push({ name, mapId, time_ms: timeMs, date: new Date().toISOString().slice(0, 10) });
-  wsLeaderboard.sort((a, b) => a.time_ms - b.time_ms);
+  wsLeaderboard.push({ name, mapId, time: timeSec, date: new Date().toISOString().slice(0, 10) });
+  wsLeaderboard.sort((a, b) => a.time - b.time);
   if (wsLeaderboard.length > MAX_LEADERBOARD * 4) wsLeaderboard.length = MAX_LEADERBOARD * 4;
 }
 
