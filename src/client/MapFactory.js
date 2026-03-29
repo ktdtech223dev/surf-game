@@ -327,77 +327,82 @@ function _buildStars(scene, count, edgeColor, tag) {
  * The ramp V-shape is computed in a local coordinate system and then rotated
  * into world space.
  */
-function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, height, y, pal) {
-  const SEGS = 10;
-  const arcStep = totalAngle / SEGS;
-  // Arc length per segment
-  const segLen  = Math.abs(radius * arcStep) + 20;
-  const outerX  = rampWidth / 2 + 50;
-  // Each curved segment has a small Y drop to maintain momentum
-  const dropPerSeg = outerX * 0.22;  // gentle bank slope
+function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, _height, y, pal) {
+  // More segments = smoother curve
+  const SEGS     = 14;
+  const arcStep  = totalAngle / SEGS;
+  const outerHalfW = rampWidth / 2 + 50;
+
+  // Bank height: outer edges are bankH units ABOVE inner (center) edge.
+  // Ratio ~4.2 matches the ~75° bank angle of straight sections so the
+  // curve walls feel consistent with what the player just left.
+  const BANK_RATIO = 4.2;
+  const bankH = outerHalfW * BANK_RATIO;
+
+  // Travel drop: very gentle — curves sit on flat connector pads so they
+  // should barely descend along the direction of travel.
+  // ~1.5 % of outerHalfW per segment keeps the curve nearly flat while
+  // still giving physics a slight downward slope to work with.
+  const dropPerSeg = outerHalfW * 0.015;
 
   let facingAngle = 0;
-  let cx = x;
-  let cz = z;
-  let cy = y;
+  let cx = x, cz = z, cy = y;
 
   for (let i = 0; i < SEGS; i++) {
-    const nextAngle = facingAngle + arcStep;
-    const midAngle  = facingAngle + arcStep * 0.5;
+    const midAngle = facingAngle + arcStep * 0.5;
 
-    // Local forward and right axes
+    // Forward and right axes in the XZ plane for this segment
     const fwdX  =  Math.sin(midAngle);
     const fwdZ  =  Math.cos(midAngle);
     const rightX =  Math.cos(midAngle);
     const rightZ = -Math.sin(midAngle);
 
-    const sy = cy;
-    const ey = cy - dropPerSeg;
+    // Arc-length for this segment (no padding — adds to staircase look)
+    const segLen = Math.abs(radius * arcStep);
 
-    // ── Left ramp quad in world space ────────────────────────────────────
-    // Outer edge stays at sy, inner edge drops to ey (like normal ramp)
-    const lv0 = Vec3.create(cx - rightX * outerX, sy, cz - rightZ * outerX);
-    const lv1 = Vec3.create(cx,                   ey, cz                   );
-    const lv2 = Vec3.create(cx + fwdX * segLen,   ey, cz + fwdZ * segLen  );
-    const lv3 = Vec3.create(cx + fwdX * segLen - rightX * outerX,  sy,
-                            cz + fwdZ * segLen - rightZ * outerX);
+    // End position of this segment
+    const nx = cx + fwdX * segLen;
+    const nz = cz + fwdZ * segLen;
 
-    // Normal: points away from ramp surface (upward-outward)
-    const lNorm = Vec3.normalize(Vec3.create(
-       dropPerSeg * rightX + dropPerSeg * 0.1,
-       outerX,
-       dropPerSeg * rightZ + dropPerSeg * 0.1,
-    ));
+    // Inner (center, low) and outer (edges, high) heights.
+    // bankH separates them to produce the steep ~75° surf-ramp cross-section.
+    // dropPerSeg is the tiny travel-direction descent along the arc.
+    const innerSy = cy;
+    const innerEy = cy - dropPerSeg;
+    const outerSy = cy + bankH;
+    const outerEy = cy - dropPerSeg + bankH;
+
+    // ── Left ramp: outer-left (high) → inner-center (low) ────────────────
+    const lv0 = Vec3.create(cx - rightX * outerHalfW, outerSy, cz - rightZ * outerHalfW);
+    const lv1 = Vec3.create(cx,                        innerSy, cz                       );
+    const lv2 = Vec3.create(nx,                        innerEy, nz                       );
+    const lv3 = Vec3.create(nx - rightX * outerHalfW,  outerEy, nz - rightZ * outerHalfW);
+
+    // Normal points from inner surface toward where the player rides
+    // (rightward + upward, mirroring straight-section convention)
+    const lNorm = Vec3.normalize(Vec3.create( bankH * rightX, outerHalfW,  bankH * rightZ));
     world.addQuadWithNormal(lv0, lv1, lv2, lv3, lNorm);
     _addRampMesh(scene, [lv0, lv1, lv2, lv3], pal.ramp, pal.edge, TAG);
 
-    // ── Right ramp quad ─────────────────────────────────────────────────
-    const rv0 = Vec3.create(cx + rightX * outerX, sy, cz + rightZ * outerX);
-    const rv1 = Vec3.create(cx,                   ey, cz                   );
-    const rv2 = Vec3.create(cx + fwdX * segLen,   ey, cz + fwdZ * segLen  );
-    const rv3 = Vec3.create(cx + fwdX * segLen + rightX * outerX, sy,
-                            cz + fwdZ * segLen + rightZ * outerX);
+    // ── Right ramp: outer-right (high) → inner-center (low) ──────────────
+    const rv0 = Vec3.create(cx + rightX * outerHalfW, outerSy, cz + rightZ * outerHalfW);
+    const rv1 = Vec3.create(cx,                        innerSy, cz                       );
+    const rv2 = Vec3.create(nx,                        innerEy, nz                       );
+    const rv3 = Vec3.create(nx + rightX * outerHalfW,  outerEy, nz + rightZ * outerHalfW);
 
-    const rNorm = Vec3.normalize(Vec3.create(
-      -dropPerSeg * rightX - dropPerSeg * 0.1,
-       outerX,
-      -dropPerSeg * rightZ - dropPerSeg * 0.1,
-    ));
+    const rNorm = Vec3.normalize(Vec3.create(-bankH * rightX, outerHalfW, -bankH * rightZ));
     world.addQuadWithNormal(rv0, rv1, rv2, rv3, rNorm);
     _addRampMesh(scene, [rv0, rv1, rv2, rv3], pal.ramp, pal.edge, TAG);
 
-    // ── Floor of the arc segment ─────────────────────────────────────────
+    // ── Floor at inner level ──────────────────────────────────────────────
     world.addFloor(
-      cx + fwdX * segLen * 0.5,
-      cz + fwdZ * segLen * 0.5,
-      rampWidth, segLen, ey
+      (cx + nx) * 0.5, (cz + nz) * 0.5,
+      rampWidth, segLen, innerEy,
     );
 
-    // Advance arc
+    // Advance along the arc
     facingAngle += arcStep;
-    cx += fwdX * segLen;
-    cz += fwdZ * segLen;
-    cy  = ey;
+    cx = nx; cz = nz; cy = innerEy;
   }
 }
 
