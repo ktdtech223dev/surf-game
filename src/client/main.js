@@ -576,7 +576,9 @@ const mainMenu = new MainMenu(async (mapId) => {
 }, input, net);
 mainMenu.onJoinOnline    = _joinOnline;
 mainMenu._xpSystem       = xpSys;
+mainMenu._net            = net;   // gives _renderTab access to net.lobbyState
 mainMenu.onOpenLoadout   = () => {
+  mainMenu._tab = 'play'; // reset so re-show after loadout close doesn't re-trigger loadout
   mainMenu.hide();
   // Keep menuOpen = true so pointer lock cannot be (re)acquired inside loadout
   input.menuOpen = true;
