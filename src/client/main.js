@@ -778,9 +778,13 @@ function _updateRunTimer() {
     currentRunSec = (performance.now() - runStartTime) / 1000;
     _updateSplits(pos, currentRunSec);
 
-    if (!_finishedThisRun &&
-        pos.z > activeMap.FINISH_Z &&
-        pos.y < (activeMap.FINISH_Y ?? -1000) + 80) {
+    if (!_finishedThisRun && (() => {
+        // Works for any map heading: XZ distance to finish gate + Y within range
+        const dx = pos.x - (activeMap.FINISH_X ?? 0);
+        const dz = pos.z - (activeMap.FINISH_Z ?? 99999);
+        return (dx * dx + dz * dz) < 700 * 700 &&
+               pos.y < (activeMap.FINISH_Y ?? -1000) + 120;
+      })()) {
       _finishedThisRun = true;
       ghostSys.stopRecording();
       _showFinish(currentRunSec);
@@ -790,7 +794,8 @@ function _updateRunTimer() {
     }
   }
 
-  if (pos.z < 100) {
+  // Reset run if player returns near spawn (within 300 units of origin in XZ)
+  if (pos.x * pos.x + pos.z * pos.z < 300 * 300 && pos.z < 200) {
     runActive = false; runStartTime = null; currentRunSec = null; _finishedThisRun = false;
     _resetSplits();
     if (splitEl) splitEl.style.display = 'none';

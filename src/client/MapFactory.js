@@ -12,6 +12,10 @@ import { generateProceduralEntry } from './ProceduralMapGen.js';
 // Tag for cleanup
 const TAG = 'mapObj';
 
+// Direction helpers — heading `a` (radians, 0 = along +Z)
+const _fwd = a => ({ x: Math.sin(a), z: Math.cos(a) });
+const _rgt = a => ({ x: Math.cos(a), z: -Math.sin(a) });
+
 export const MapFactory = {
 
   clear(scene) {
@@ -69,112 +73,128 @@ export const MapFactory = {
 
     // ── Build sections ──────────────────────────────────────────────────────
     const { sections, padLens, spawnY = 0 } = def;
-    let curZ = 0;
-    let curY = spawnY;
+    let curX = 0, curZ = 0;   // world-space position of section inner-center start
+    let curY     = spawnY;
+    let curAngle = 0;          // heading in radians; 0 = +Z forward
 
     // Spawn pad
     const spawnLen = padLens[0] ?? 400;
-    _buildPad(scene, world, 0, curY - 10, curZ + spawnLen / 2, 700, 20, spawnLen, pal, TAG);
-    curZ += spawnLen;
-
-    // Direction arrow on spawn pad
-    _addArrow(scene, 0, curY + 1, curZ - spawnLen / 2 + 80, TAG);
+    {
+      const f = _fwd(curAngle);
+      const cx = curX + f.x * spawnLen / 2;
+      const cz = curZ + f.z * spawnLen / 2;
+      _buildPad(scene, world, cx, curY - 10, cz, 700, 20, spawnLen, curAngle, pal, TAG);
+      _addArrow(scene, cx, curY + 1, cz, curAngle, TAG);
+      curX += f.x * spawnLen;
+      curZ += f.z * spawnLen;
+    }
 
     const sectionBounds = [];
 
     for (let si = 0; si < sections.length; si++) {
       const sec     = sections[si];
       const outerX  = sec.w / 2 + 60;
-      const startZ  = curZ;
-      const startY  = curY;
-      const endZ    = curZ + sec.depth;
       const dropAbs = Math.abs(sec.dropY);
-      const endY    = curY + sec.dropY; // negative
+      const depth   = sec.depth;
+      const startY  = curY;
+      const endY    = curY + sec.dropY;
 
-      // ── Physics quads (exact ramp geometry) ────────────────────────────
-      // Left ramp: outer edge at -outerX (high), inner edge at 0 (low)
-      const lv0 = Vec3.create(-outerX, startY, startZ);
-      const lv1 = Vec3.create(      0, endY,   startZ);
-      const lv2 = Vec3.create(      0, endY,   endZ);
-      const lv3 = Vec3.create(-outerX, startY, endZ);
-      const lNorm = Vec3.normalize(Vec3.create(dropAbs, outerX, 0));
+      const f = _fwd(curAngle);
+      const r = _rgt(curAngle);
+
+      // Inner (center, low) start/end
+      const iSx = curX,              iSz = curZ;
+      const iEx = curX + f.x * depth, iEz = curZ + f.z * depth;
+
+      // Left outer (high) start/end
+      const lSx = iSx - r.x * outerX, lSz = iSz - r.z * outerX;
+      const lEx = iEx - r.x * outerX, lEz = iEz - r.z * outerX;
+
+      // Right outer (high) start/end
+      const rSx = iSx + r.x * outerX, rSz = iSz + r.z * outerX;
+      const rEx = iEx + r.x * outerX, rEz = iEz + r.z * outerX;
+
+      // ── Physics quads ──────────────────────────────────────────────────
+      const lv0 = Vec3.create(lSx, startY, lSz);
+      const lv1 = Vec3.create(iSx, endY,   iSz);
+      const lv2 = Vec3.create(iEx, endY,   iEz);
+      const lv3 = Vec3.create(lEx, startY, lEz);
+      const lNorm = Vec3.normalize(Vec3.create(dropAbs * r.x, outerX, dropAbs * r.z));
       world.addQuadWithNormal(lv0, lv1, lv2, lv3, lNorm);
 
-      // Right ramp
-      const rv0 = Vec3.create(outerX, startY, startZ);
-      const rv1 = Vec3.create(     0, endY,   startZ);
-      const rv2 = Vec3.create(     0, endY,   endZ);
-      const rv3 = Vec3.create(outerX, startY, endZ);
-      const rNorm = Vec3.normalize(Vec3.create(-dropAbs, outerX, 0));
+      const rv0 = Vec3.create(rSx, startY, rSz);
+      const rv1 = Vec3.create(iSx, endY,   iSz);
+      const rv2 = Vec3.create(iEx, endY,   iEz);
+      const rv3 = Vec3.create(rEx, startY, rEz);
+      const rNorm = Vec3.normalize(Vec3.create(-dropAbs * r.x, outerX, -dropAbs * r.z));
       world.addQuadWithNormal(rv0, rv1, rv2, rv3, rNorm);
 
-      // ── Visual ramp meshes ────────────────────────────────────────────
+      // ── Visual ramp meshes ─────────────────────────────────────────────
       _addRampMesh(scene, [lv0, lv1, lv2, lv3], pal.ramp, pal.edge, TAG);
       _addRampMesh(scene, [rv0, rv1, rv2, rv3], pal.ramp, pal.edge, TAG);
 
-      // ── Side ledges ────────────────────────────────────────────────────
-      const ledgeW   = 60;
-      const ledgeMidZ = startZ + sec.depth / 2;
-      world.addFloor(-outerX - ledgeW / 2, ledgeMidZ, ledgeW, sec.depth, startY);
-      world.addFloor( outerX + ledgeW / 2, ledgeMidZ, ledgeW, sec.depth, startY);
+      // ── Side ledges (physics) ──────────────────────────────────────────
+      const ledgeW = 60;
+      const midX = (iSx + iEx) / 2, midZ = (iSz + iEz) / 2;
+      world.addFloor(midX - r.x * (outerX + ledgeW / 2), midZ - r.z * (outerX + ledgeW / 2), ledgeW, depth, startY);
+      world.addFloor(midX + r.x * (outerX + ledgeW / 2), midZ + r.z * (outerX + ledgeW / 2), ledgeW, depth, startY);
 
-      // ── Checkpoint gate ───────────────────────────────────────────────
+      // ── Checkpoint gate ────────────────────────────────────────────────
       const gateColor = [0x00ff88, 0x00aaff, 0xaa44ff, 0xff6600, 0xff00aa, 0xffff00,
                          0x00ffcc, 0xff4400, 0x44ffaa][si % 9];
-      const gate = buildGate({ x: 0, y: endY, z: endZ - 10, w: outerX * 2, h: 140, color: gateColor });
+      const gate = buildGate({ x: iEx, y: endY, z: iEz, w: outerX * 2, h: 140, color: gateColor, angle: curAngle });
       gate.userData[TAG] = true;
       scene.add(gate);
 
-      sectionBounds.push({ startZ, endZ, label: `S${si + 1}`, startY, endY, outerX });
+      sectionBounds.push({ startZ: iSz, endZ: iEz, startX: iSx, endX: iEx, label: `S${si + 1}`, startY, endY, outerX });
 
-      curZ = endZ;
-      curY = endY;
+      curX = iEx; curZ = iEz; curY = endY;
 
       // ── Connector pad ─────────────────────────────────────────────────
       const padLen = padLens[si + 1] ?? 240;
-      _buildPad(scene, world, 0, curY - 10, curZ + padLen / 2, 700, 20, padLen, pal, TAG);
-      curZ += padLen;
+      {
+        const pf = _fwd(curAngle);
+        const pcx = curX + pf.x * padLen / 2;
+        const pcz = curZ + pf.z * padLen / 2;
+        _buildPad(scene, world, pcx, curY - 10, pcz, 700, 20, padLen, curAngle, pal, TAG);
 
-      // ── Curved section on connector pad ──────────────────────────────
-      if (def.curvedSections) {
-        for (const cs of def.curvedSections) {
-          if (cs.afterPad === si) {
-            const curveStartZ = curZ - padLen + 30;
-            _buildCurvedSection(
-              scene, world,
-              0, curveStartZ,
-              cs.radius, cs.angle,
-              cs.width, cs.height ?? 20,
-              curY, pal,
-              def.bankRatio ?? 4.0
-            );
+        // ── Curved sections on this pad ──────────────────────────────────
+        if (def.curvedSections) {
+          for (const cs of def.curvedSections) {
+            if (cs.afterPad === si) {
+              // Start 30 units into the pad, in the current heading
+              const csX = curX + pf.x * 30;
+              const csZ = curZ + pf.z * 30;
+              _buildCurvedSection(scene, world, csX, csZ, cs.radius, cs.angle,
+                cs.width, cs.height ?? 20, curY, pal, def.bankRatio ?? 4.0, curAngle);
+              curAngle += cs.angle; // advance heading after the curve
+            }
           }
         }
-      }
 
-      // ── Kill zone below this section ──────────────────────────────────
-      world.addKillZone(
-        Vec3.create(-4000, endY - 250, startZ),
-        Vec3.create( 4000, endY - 40, curZ),
-      );
+        // Advance position to end of pad (the pad was built in direction pf)
+        curX += pf.x * padLen;
+        curZ += pf.z * padLen;
+      }
     }
 
     // ── Finish gate ────────────────────────────────────────────────────────
-    const finishGate = buildGate({ x: 0, y: curY, z: curZ, w: 600, h: 160, color: 0xffd700 });
+    const finishGate = buildGate({ x: curX, y: curY, z: curZ, w: 600, h: 160, color: 0xffd700, angle: curAngle });
     finishGate.userData[TAG] = true;
     scene.add(finishGate);
 
     // ── Finish pad ────────────────────────────────────────────────────────
     const finPad = padLens[sections.length] ?? 500;
-    _buildPad(scene, world, 0, curY - 10, curZ + finPad / 2, 800, 20, finPad, pal, TAG);
+    {
+      const ff = _fwd(curAngle);
+      const fcx = curX + ff.x * finPad / 2;
+      const fcz = curZ + ff.z * finPad / 2;
+      _buildPad(scene, world, fcx, curY - 10, fcz, 800, 20, finPad, curAngle, pal, TAG);
+    }
 
-    // ── Global kill bands ──────────────────────────────────────────────
-    world.addKillZone(
-      Vec3.create(-4000, curY - 450, -500),
-      Vec3.create( 4000, curY - 60,  curZ + finPad),
-    );
-    world.addKillZone(Vec3.create(-4000, -5000, -500), Vec3.create(-650, 1000, curZ + 500));
-    world.addKillZone(Vec3.create( 650,  -5000, -500), Vec3.create(4000, 1000, curZ + 500));
+    // ── Global bottom kill zone ─────────────────────────────────────────
+    const lowestY = sectionBounds.reduce((m, s) => Math.min(m, s.endY), curY);
+    world.addKillZone(Vec3.create(-9000, lowestY - 300, -9000), Vec3.create(9000, lowestY - 50, 9000));
 
     // ── Background grid ────────────────────────────────────────────────
     const grid = new THREE.GridHelper(40000, 300, 0x223344, 0x1a2a3a);
@@ -199,11 +219,13 @@ export const MapFactory = {
       difficulty: def.difficulty,
       knifeId:    def.knifeId,
 
+      FINISH_X:    curX,
       FINISH_Z:    curZ,
       FINISH_Y:    curY,
+      SPAWN_X:     0,
       SPAWN_Z:     0,
       SPAWN_Y:     spawnY,
-      WORLD_MIN_Y: curY - 1000,
+      WORLD_MIN_Y: lowestY - 500,
 
       sectionBounds,
       sectionZBounds,
@@ -319,25 +341,16 @@ function _buildStars(scene, count, edgeColor, tag) {
  * The ramp V-shape is computed in a local coordinate system and then rotated
  * into world space.
  */
-function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, _height, y, pal, bankRatio = 4.0) {
+function _buildCurvedSection(scene, world, x, z, radius, totalAngle, rampWidth, _height, y, pal, bankRatio = 4.0, initialAngle = 0) {
   // More segments = smoother curve
   const SEGS     = 14;
   const arcStep  = totalAngle / SEGS;
   const outerHalfW = rampWidth / 2 + 50;
 
-  // Bank height: outer edges are bankH units ABOVE inner (center) edge.
-  // bankRatio is passed from the map definition so curves match the
-  // straight section bank angle of the same map.
-  const BANK_RATIO = bankRatio;
-  const bankH = outerHalfW * BANK_RATIO;
-
-  // Travel drop: very gentle — curves sit on flat connector pads so they
-  // should barely descend along the direction of travel.
-  // ~1.5 % of outerHalfW per segment keeps the curve nearly flat while
-  // still giving physics a slight downward slope to work with.
+  const bankH      = outerHalfW * bankRatio;
   const dropPerSeg = outerHalfW * 0.015;
 
-  let facingAngle = 0;
+  let facingAngle = initialAngle;   // start in the current map heading
   let cx = x, cz = z, cy = y;
 
   for (let i = 0; i < SEGS; i++) {
@@ -427,14 +440,18 @@ function _addLine(scene, a, b, color, tag) {
   scene.add(line);
 }
 
-function _buildPad(scene, world, x, y, z, w, h, d, pal, tag) {
+// angle = heading in radians; the pad box is rotated around Y so depth aligns with heading
+function _buildPad(scene, world, cx, y, cz, w, h, d, angle, pal, tag) {
   const geo  = new THREE.BoxGeometry(w, h, d);
   const mesh = new THREE.Mesh(geo, makeMat(pal.pad ?? 0x080808));
-  mesh.position.set(x, y, z);
+  mesh.position.set(cx, y, cz);
+  mesh.rotation.y = angle;
   mesh.userData[tag] = true;
   mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), makeEdgeMat(0x1a1a2a)));
   scene.add(mesh);
-  world.addFloor(x, z, w, d, y + h / 2);
+  // Physics footprint: use a square from the larger of w/d so it covers any rotation
+  const fp = Math.max(w, d);
+  world.addFloor(cx, cz, fp, fp, y + h / 2);
 }
 
 function _buildBox(scene, x, y, z, w, h, d, color, edgeColor, tag) {
@@ -446,14 +463,22 @@ function _buildBox(scene, x, y, z, w, h, d, color, edgeColor, tag) {
   scene.add(mesh);
 }
 
-function _addArrow(scene, x, y, z, tag) {
-  const pts = [
-    new THREE.Vector3(x - 30, y, z - 50),
-    new THREE.Vector3(x,      y, z + 50),
-    new THREE.Vector3(x + 30, y, z - 50),
-    new THREE.Vector3(x,      y, z - 15),
-    new THREE.Vector3(x - 30, y, z - 50),
+// Arrow pointing in the direction of `angle` (0 = +Z forward)
+function _addArrow(scene, x, y, z, angle, tag) {
+  const s = Math.sin(angle), c = Math.cos(angle);
+  // Local coords: tip at (0, 0, 50), base at (±30, 0, -50), notch at (0, 0, -15)
+  const local = [
+    { lx: -30, lz: -50 },
+    { lx:   0, lz:  50 },
+    { lx:  30, lz: -50 },
+    { lx:   0, lz: -15 },
+    { lx: -30, lz: -50 },
   ];
+  const pts = local.map(p => new THREE.Vector3(
+    x + p.lx * c + p.lz * s,
+    y,
+    z - p.lx * s + p.lz * c,
+  ));
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
     new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })

@@ -155,7 +155,7 @@ export function buildPad(opts) {
 
 // ── Checkpoint gate ───────────────────────────────────────────────────────────
 export function buildGate(opts) {
-  const { x = 0, y = 0, z = 0, w = 600, h = 150, color = 0x00ff88 } = opts;
+  const { x = 0, y = 0, z = 0, w = 600, h = 150, color = 0x00ff88, angle = 0 } = opts;
   const group = new THREE.Group();
 
   const postGeo  = new THREE.BoxGeometry(12, h, 12);
@@ -170,6 +170,7 @@ export function buildGate(opts) {
   bar.position.set(0, h, 0);
 
   group.add(leftPost, rightPost, bar);
+  group.rotation.y = angle;   // rotate gate perpendicular to current heading
   group.position.set(x, y, z);
   return group;
 }
